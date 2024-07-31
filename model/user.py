@@ -9,7 +9,7 @@ import bcrypt
 class User(Base):
     __tablename__ = "users"
 
-    user_id = mapped_column(String(10), primary_key=True, autoincrement=True)
+    user_id = mapped_column(String(10), primary_key=True)
     email = mapped_column(String(100), nullable=False)
     password_hash = mapped_column(String(255), nullable=False)
     role = mapped_column(Enum("buyer", "seller", name="role"), nullable=False)
