@@ -1,7 +1,7 @@
 from flask import Flask
 from dotenv import load_dotenv
-from datetime import timedelta
 import os
+from connectors.mysql_connectors import connection
 
 app = Flask(__name__)
 
