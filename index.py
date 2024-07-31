@@ -24,6 +24,11 @@ app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(hours=8)
 
+username = os.getenv("DB_USERNAME")
+password = os.getenv("DB_PASSWORD")
+host = os.getenv("DB_HOST")
+database = os.getenv("DB_DATABASE")
+
 app.register_blueprint(user_routes)
 app.register_blueprint(product_routes)
 app.register_blueprint(category_routes)
@@ -32,7 +37,7 @@ app.register_blueprint(category_routes)
 
 @jwt.user_identity_loader
 def user_identity_lookup(user):
-    return user.id
+    return user.user_id
 
 
 @jwt.user_lookup_loader
@@ -41,7 +46,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
     Session = sessionmaker(connection)
     s = Session()
 
-    user = s.query(User).filter(User.id == identity).first()
+    user = s.query(User).filter(User.user_id == identity).first()
     return user
 
 
