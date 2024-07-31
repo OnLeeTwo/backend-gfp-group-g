@@ -11,6 +11,7 @@ cerberus = "*"
 flask-jwt-extended = "*"
 nanoid = "*"
 python-dotenv = "*"
+mysql-connector-python = "*"
 
 [dev-packages]
 
