@@ -10,6 +10,7 @@ bcrypt = "*"
 cerberus = "*"
 flask-jwt-extended = "*"
 nanoid = "*"
+python-dotenv = "*"
 
 [dev-packages]
 
