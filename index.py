@@ -12,6 +12,7 @@ from model.token import TokenBlocklist
 
 from controllers.user import user_routes
 from controllers.product import product_routes
+from controllers.category import category_routes
 
 load_dotenv()
 
@@ -24,6 +25,7 @@ app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 app.register_blueprint(user_routes)
 app.register_blueprint(product_routes)
+app.register_blueprint(category_routes)
 
 
 @jwt.user_identity_loader

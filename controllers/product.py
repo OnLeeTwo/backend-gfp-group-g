@@ -6,7 +6,7 @@ from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
 
 from flask_jwt_extended import (
-     create_access_token,
+    create_access_token,
     create_refresh_token,
     jwt_required,
     get_jwt,
@@ -17,7 +17,7 @@ from flask_jwt_extended import (
 product_routes = Blueprint("product_routes", __name__)
 
 @product_routes.route('/products', methods=['GET'])
-
+@jwt_required()
 def products_all():
 
     Session = sessionmaker(connection)
@@ -43,6 +43,7 @@ def products_all():
         s.close()
 
 @product_routes.route('/product/<id>', methods=['GET'])
+@jwt_required()
 def product_by_id(id):
      
     Session = sessionmaker(connection)
