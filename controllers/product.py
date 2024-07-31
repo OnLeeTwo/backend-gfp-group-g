@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from model.product import Product
+from model.category import Category
 
 from nanoid import generate
 from connectors.mysql_connectors import connection
@@ -15,6 +16,10 @@ from flask_jwt_extended import (
 )
 
 product_routes = Blueprint("product_routes", __name__)
+
+# create function to assign category. User
+
+
 
 @product_routes.route('/products', methods=['GET'])
 @jwt_required()
@@ -76,17 +81,40 @@ def create_product():
     s = Session()
     s.begin()
     try:
+        check_name = s.query(Category).filter(Category.name == request.form['category']).first()
         new_product_id = f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+        if len(check_name) > 0:
+            category = check_name.id
+        else:
+            category = f"C-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+            new_category = Category(
+                id = category,
+                name=request.form['category']
+            )
+            s.add(new_category)
+            s.commit()
+        
         product_name = request.form['name']
-        product_price = request.form['price']
-        product_category_id = request.form['category_id']
-        product_stock = request.form['stock']
-        product_images = request.form['images']
-        product_premium = request.form['is_premium']
+        product_price = ''
+        product_stock = ''
+        product_images = ''
+        product_premium = ''
         created_by, updated_by = ''
         new_product = Product(
-            id=new_product_id
+            id=new_product_id,
+            category_id=category,
+            name=product_name,
+            price=float(product_price),
+            stock=int(product_stock),
+            images=product_images,
+            is_premium=product_premium,
+            created_by=created_by,
+            updated_by=updated_by
+
         )
+
+        s.add(new_product)
+        s.commit()
 
         return {
             "success": True,
