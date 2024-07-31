@@ -159,6 +159,8 @@ def update_user():
     Session = sessionmaker(connection)
     s = Session()
 
+    s.begin()
+
     try:
         user = s.query(User).filter(User.user_id == current_user_id).first()
         if not user:
