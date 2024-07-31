@@ -64,6 +64,7 @@ def register_user():
 
         NewUser.set_password(request.form["password"])
         s.add(NewUser)
+        s.flush()
 
         if role == "seller":
             new_seller_id = f"S-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
@@ -86,8 +87,8 @@ def register_user():
 def login():
     v = Validator(login_schema)
     request_body = {
-        "email": request.form.get("email"),
-        "password": request.form.get("password"),
+        "email": request.form["email"],
+        "password": request.form["password"],
     }
 
     if not v.validate(request_body):
@@ -98,12 +99,14 @@ def login():
 
     s.begin()
     try:
-
         user = s.query(User).filter(User.email == request_body["email"]).first()
 
         if user and user.check_password(request_body["password"]):
-            access_token = create_access_token(identity=user.user_id)
-            refresh_token = create_refresh_token(identity=user.user_id)
+            access_token = create_access_token(
+                identity=user,
+                additional_claims={"email": user.email, "user_id": user.user_id},
+            )
+            refresh_token = create_refresh_token(identity=user)
 
             return {
                 "message": "Login successful",
@@ -128,7 +131,7 @@ def login():
 def get_user():
     return (
         {
-            "user_id": current_user.id,
+            "user_id": current_user.user_id,
             "email": current_user.email,
             "role": current_user.role,
             "created_at": current_user.created_at,
