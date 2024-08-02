@@ -2,20 +2,17 @@ from flask import Flask
 from dotenv import load_dotenv
 from datetime import timedelta
 import os
-
 from flask_jwt_extended import JWTManager
 from sqlalchemy.orm import sessionmaker
 from connectors.mysql_connectors import connection
-
-from models.market import Market
-
+from model.market import Market
 from controllers.market import market_routes
 
 load_dotenv()
 
 app = Flask(__name__)
 
-load_dotenv()
+
 
 
 @app.route("/")

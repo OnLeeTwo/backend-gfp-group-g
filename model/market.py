@@ -1,7 +1,7 @@
 from sqlalchemy.sql import func 
 from sqlalchemy import String, DateTime, Enum, Boolean, Integer, Text, ForeignKey
 from sqlalchemy.orm import mapped_column, Relationship
-from models.base import Base
+from model.base import Base
 
 class Market(Base):
     __tablename__ = "market"
