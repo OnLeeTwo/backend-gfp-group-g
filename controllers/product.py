@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from model.product import Product
 from model.category import Category
-
+from datetime import datetime
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
@@ -26,9 +26,9 @@ def products_all():
     s.begin()
     try:
         products =[]
-        data = Select(Product)
-        result = s.execute(data)
-        for row in result.scalars():
+        data = s.query(Product).filter(Product.is_deleted==0).all()
+        # result = s.execute(data)
+        for row in data:
             products.append({
                 "id": row.id,
                 "product_name": row.name,
@@ -64,7 +64,7 @@ def product_by_id(id):
     s.begin()
     try:
         product = []
-        products = s.query(Product).filter(Product.id==id).first()
+        products = s.query(Product).filter(Product.id==id).filter(Product.is_deleted==0).first()
         if products is None:
             return {
                 "message": "product not found"
@@ -159,5 +159,33 @@ def update_product(id):
     return {"message": "this is will update product based on id"}
 
 @product_routes.route('/product/<id>', methods=["DELETE"])
+@jwt_required()
 def delete_product(id):
-    return {"message": "this is will delete product based on id"}
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        product = s.query(Product).filter(Product.id==id).filter(Product.is_deleted==0).first()
+        if product is None:
+            return {
+                "message": "product not found"
+            }, 404
+        product.is_deleted = 1
+        time_now = datetime.now()
+        product.time_deleted = time_now.replace(microsecond=0)
+      
+        s.commit()
+        return {
+            "success": True,
+            "message": "Success delete product"
+        }, 200
+        
+    except Exception as e:
+        s.rollback()
+        return {
+            "message": "error delete product",
+            "error": (e)
+        }, 500
+    finally:
+        s.close()
+        

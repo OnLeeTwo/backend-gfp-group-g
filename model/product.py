@@ -17,7 +17,7 @@ class Product(Base):
     images =  mapped_column(String(100), nullable=False)
     is_premium =  mapped_column(Integer, default=0)
     is_deleted = mapped_column(Integer, default=0)
-    time_deleted = mapped_column(DateTime(timezone=True), nullable=True)
+    time_deleted = mapped_column(String)
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by = mapped_column(String(100))
     updated_at = mapped_column(DateTime(timezone=True), server_default=func.now())
