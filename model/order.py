@@ -9,6 +9,7 @@ class OrderStatus(enum.Enum):
     shipping = "Shipping"
     delivered = "Delivered"
     arrived = "Arrived"
+    cancelled = "Cancelled"
 
 
 class PaymentStatus(enum.Enum):

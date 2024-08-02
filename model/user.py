@@ -14,7 +14,9 @@ class User(Base):
     password_hash = mapped_column(String(255), nullable=False)
     role = mapped_column(Enum("buyer", "seller", name="role"), nullable=False)
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     is_deleted = mapped_column(Boolean, default=False)
     time_deleted = mapped_column(DateTime(timezone=True), nullable=True)
     profile_picture = mapped_column(String(255), nullable=True)

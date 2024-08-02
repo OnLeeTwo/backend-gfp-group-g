@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DECIMAL, DateTime, Date, func
+from sqlalchemy import String, DECIMAL, DateTime, Date, func
 from sqlalchemy.orm import mapped_column
 from model.base import Base
 
@@ -13,6 +13,8 @@ class Promotion(Base):
     created_at = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    updated_at = mapped_column(DateTime(timezone=True), default=None)
+    updated_at = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     start_date = mapped_column(Date, nullable=False)
     end_date = mapped_column(Date, nullable=False)
