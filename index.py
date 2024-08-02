@@ -76,16 +76,16 @@ def missing_token_callback(error):
     )
 
 
-@jwt.token_in_blocklist_loader
-def token_in_blocklist_callback(jwt_header, jwt_data):
-    Session = sessionmaker(connection)
-    s = Session()
-
-    jti = jwt_data["jti"]
-
-    token = s.query(TokenBlocklist).filter(TokenBlocklist.jti == jti).scalar()
-
-    return token is not None
+# @jwt.token_in_blocklist_loader
+# def token_in_blocklist_callback(jwt_header, jwt_data):
+#    Session = sessionmaker(connection)
+#    s = Session()
+#
+#    jti = jwt_data["jti"]
+#
+#    token = s.query(TokenBlocklist).filter(TokenBlocklist.jti == jti).scalar()
+#
+#    return token is not None
 
 
 @app.route("/")
