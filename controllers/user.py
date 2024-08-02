@@ -119,9 +119,11 @@ def login():
             }, 200
 
         else:
+            s.rollback()
             return {"error": "Invalid email or password"}, 401
 
     except Exception as e:
+        s.rollback()
         print(f"Error during login: {e}")
         return {"error": "Failed to login, please try again later"}, 500
     finally:
