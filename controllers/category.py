@@ -1,5 +1,6 @@
 from flask import Blueprint
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Select
 from connectors.mysql_connectors import connection
 from model.category import Category
 from flask_jwt_extended import (
@@ -20,14 +21,21 @@ def category_all():
     s = Session()
     s.begin()
     try:
-        categories = s.query(Category).all()
-        if len(categories) < 1: 
+        category = []
+        categories = Select(Category)
+        result = s.execute(categories)
+        for row in result.scalars():
+            category.append({
+                'id': row.id,
+                'name': row.name
+            })
+        if len(category) < 1: 
             return {
                 "message": "Categories is empty"
             }, 404
         return {
             "success": True,
-            "data": categories
+            "data": category
         }
     except Exception as e: 
         return {
@@ -44,15 +52,21 @@ def category_by_id(id):
     s = Session()
     s.begin()
     try:
+        category = []
         categories = s.query(Category).filter(Category.id==id).first()
-        if len(categories) < 1: 
+        if categories is not None:
+            category.append({
+                "id": categories.id,
+                "name": categories.name
+            })
             return {
-                "message": "Categories not found"
+                "message": "success get data",
+                "data": category
+            }, 200
+        else: 
+            return {
+                "message": "category not found"
             }, 404
-        return {
-            "success": True,
-            "data": categories
-        }
     except Exception as e: 
         return {
             "message": "Error handling category",
