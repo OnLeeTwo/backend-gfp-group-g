@@ -3,7 +3,7 @@ from flask import Blueprint, request
 from model.user import User
 from model.seller import Seller
 from model.token import TokenBlocklist
-
+from model.category import Category
 from nanoid import generate
 
 from connectors.mysql_connectors import connection
@@ -26,7 +26,6 @@ from flask_jwt_extended import (
 )
 
 user_routes = Blueprint("user_routes", __name__)
-
 
 @user_routes.route("/users", methods=["POST"])
 def register_user():
@@ -117,11 +116,13 @@ def login():
                 "user_id": user.user_id,
                 "role": user.role,
             }, 200
-
+            
         else:
+            s.rollback()
             return {"error": "Invalid email or password"}, 401
 
     except Exception as e:
+
         print(f"Error during login: {e}")
         return {"error": "Failed to login, please try again later"}, 500
     finally:
