@@ -35,7 +35,6 @@ app.register_blueprint(product_routes)
 app.register_blueprint(category_routes)
 
 
-
 @jwt.user_identity_loader
 def user_identity_lookup(user):
     return user.user_id
@@ -48,7 +47,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
     s = Session()
 
     user = s.query(User).filter(User.user_id == identity).first()
-    s.rollback()
+    s.close()
     return user
 
 
@@ -86,8 +85,10 @@ def token_in_blocklist_callback(jwt_header, jwt_data):
     jti = jwt_data["jti"]
 
     token = s.query(TokenBlocklist).filter(TokenBlocklist.jti == jti).scalar()
-    s.rollback()
+    
+    s.close()
     return token is not None
+
 
 
 @app.route("/")

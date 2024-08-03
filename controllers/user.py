@@ -1,4 +1,5 @@
 from flask import Blueprint, request
+from datetime import datetime, UTC
 
 from model.user import User
 from model.seller import Seller
@@ -126,7 +127,7 @@ def login():
             return {"error": "Invalid email or password"}, 401
 
     except Exception as e:
-
+        s.rollback()
         print(f"Error during login: {e}")
         return {"error": "Failed to login, please try again later"}, 500
     finally:
@@ -203,7 +204,7 @@ def delete_user():
             return {"error": "User not found"}, 404
 
         user.is_deleted = True
-        user.time_deleted = func.now()
+        user.time_deleted = datetime.now(UTC)
 
         s.commit()
         return {"message": "User deleted successfully"}, 200
