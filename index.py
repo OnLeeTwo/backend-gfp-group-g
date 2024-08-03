@@ -1,6 +1,7 @@
 from flask import Flask
 from dotenv import load_dotenv
 from datetime import timedelta
+from sqlalchemy.exc import SQLAlchemyError
 import os
 
 from flask_jwt_extended import JWTManager
@@ -47,6 +48,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
     s = Session()
 
     user = s.query(User).filter(User.user_id == identity).first()
+    s.rollback()
     return user
 
 
@@ -84,7 +86,7 @@ def token_in_blocklist_callback(jwt_header, jwt_data):
     jti = jwt_data["jti"]
 
     token = s.query(TokenBlocklist).filter(TokenBlocklist.jti == jti).scalar()
-
+    s.rollback()
     return token is not None
 
 

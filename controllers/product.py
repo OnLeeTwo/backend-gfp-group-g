@@ -5,7 +5,7 @@ from datetime import datetime
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import Select
+from sqlalchemy import func
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
@@ -29,12 +29,13 @@ def products_all():
         data = s.query(Product).filter(Product.is_deleted==0).all()
         # result = s.execute(data)
         for row in data:
+            category = s.query(Category).filter(Category.id==row.category_id).first()
             products.append({
                 "id": row.id,
                 "product_name": row.name,
                 "price": row.price,
                 "stock": row.stock,
-                "category": row.category_id,
+                "category": category.name,
                 "is_premium": row.is_premium
             })
         if len(products) < 1: 
@@ -69,13 +70,13 @@ def product_by_id(id):
             return {
                 "message": "product not found"
             }, 404
-        
+        category = s.query(Category).filter(Category.id==products.category_id).first()
         product.append({
             "id": products.id,
             "product_name": products.name,
             "price": products.price,
             "stock": products.stock,
-            "category": products.category_id,
+            "category": category.name,
             "is_premium": products.is_premium
         })
         
@@ -122,7 +123,7 @@ def create_product():
             s.flush()
         else:
             category_id = check_category.id
-
+        print(category_id)
         newProduct = Product(
             id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
             name=product_name,
@@ -133,7 +134,6 @@ def create_product():
             is_premium=int(is_premium),
             market_id=market_id,
             is_deleted=0,
-            time_deleted='',
             created_by=current_user_id,
             updated_by=current_user_id
         )
@@ -148,15 +148,72 @@ def create_product():
         s.rollback()
         return {
             "message": "error create product",
-            "error": (e)
+            "error": e
         }, 500
     finally:
         s.close()
         
 
 @product_routes.route('/product/<id>', methods=["PUT"])
+@jwt_required()
 def update_product(id):
-    return {"message": "this is will update product based on id"}
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try: 
+        product = s.query(Product).filter(Product.id == id).first()
+        
+        if product is None:
+            return {
+                "message": "product not found"
+            }, 404
+        category_id =''
+        
+        current_user_id = get_jwt_identity()
+        product_name=request.form['product_name']
+        price=request.form['price']
+        stock=request.form['stock']
+        category=request.form['category']
+        images=request.form['images']
+        is_premium=request.form['is_premium']
+        market_id=request.form['market_id']
+        # Kurang validasi untuk market. Dibuat jika market sudah ada
+    
+        check_category = s.query(Category).filter(Category.name == category).first()
+        if check_category is None:
+            category_id = f"C-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+            newCategory = Category(
+                id=category_id,
+                name=category
+            )
+            s.add(newCategory)
+            s.flush()
+        else:
+            category_id = check_category.id
+
+       
+        product.name=product_name
+        product.price=float(price)
+        product.stock=int(stock)
+        product.category_id=category_id
+        product.images=images
+        product.is_premium=int(is_premium)
+        product.market_id=market_id
+        product.updated_by=current_user_id
+        
+        s.commit()
+        return {
+            "message": "Updated product success",
+            "success": True
+        },201
+    except Exception as e:
+        s.rollback()
+        return {
+            "message": "error update product",
+            "error": (e)
+        }, 500
+    finally:
+        s.close()
 
 @product_routes.route('/product/<id>', methods=["DELETE"])
 @jwt_required()
@@ -171,8 +228,7 @@ def delete_product(id):
                 "message": "product not found"
             }, 404
         product.is_deleted = 1
-        time_now = datetime.now()
-        product.time_deleted = time_now.replace(microsecond=0)
+        product.time_deleted = func.now()
       
         s.commit()
         return {
