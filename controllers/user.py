@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 from model.user import User
 from model.seller import Seller
 from model.token import TokenBlocklist
-from model.category import Category
 from nanoid import generate
 
 from connectors.mysql_connectors import connection
