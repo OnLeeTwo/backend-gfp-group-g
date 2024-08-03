@@ -1,4 +1,5 @@
 from flask import Blueprint, request
+from datetime import datetime, UTC
 
 from model.user import User
 from model.seller import Seller
@@ -7,6 +8,11 @@ from model.token import TokenBlocklist
 from nanoid import generate
 
 from connectors.mysql_connectors import connection
+from model.category import Category
+from nanoid import generate
+
+from connectors.mysql_connectors import connection
+from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
 from cerberus import Validator
@@ -24,7 +30,6 @@ from flask_jwt_extended import (
 )
 
 user_routes = Blueprint("user_routes", __name__)
-
 
 @user_routes.route("/users", methods=["POST"])
 def register_user():
