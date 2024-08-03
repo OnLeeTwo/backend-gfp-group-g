@@ -89,6 +89,7 @@ def token_in_blocklist_callback(jwt_header, jwt_data):
     return token is not None
 
 
+
 @app.route("/")
 def hello_world():
     return "Hello World"
