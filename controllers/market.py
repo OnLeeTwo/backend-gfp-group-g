@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from model.market import Market
+from model.seller import Seller
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
@@ -33,26 +34,102 @@ def create_market():
     s = Session()
     s.begin()
     try:
+        check_market = s.query(Seller).filter(Seller.user_id == request.form['seller']).filter()
         new_market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
-        market_name = request.form["name"]
-        market_create_at = request.form["created_at"]
-        market_update_at = request.form["updated_at"]
-        market_created_by = request.form["created_by"]
-        market_updated_by = request.form["updated_by"]
-        market_location = request.form["location"]
-        market_profile = request.form["profile_picture"]
-        new_market = Market(
-            id=new_market_id
+        if len(check_market > 0):
+            seller = check_market.id
+        else:
+            seller = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+            new_category = Seller(
+                id = seller,
+                name=request.form['seller']
+            )
+            s.add(new_category)
+            s.commit()
+        
+        market_name = request.form['name']
+        market_location = request.form['location']
+        market_create_at = ''
+        market_created_by = ''
+        market_update_at = ''
+        market_updated_by = ''
+        market_profile = ''
+        new_product = Market(
+            id=new_market_id,
+            seller_id=seller,
+            name=market_name,
+            location = market_location
         )
-        return{
+
+        s.add(new_product)
+        s.commit()
+
+        return {
             "success": True,
-            "message": "Market created successfully",
-            "name": market_name,
-            "location": market_location
-        }
+            "message": "Success create product",
+            "data": new_product
+        }, 201
+
     except Exception as e:
         s.rollback()
-        return {"message": "Error creating market"}, 500
+        return {
+            "message": "error create product",
+            "error": (e)
+        }, 500
+    finally:
+        s.close()
+
+@market_routes.route('/products', methods=['GET'])
+@jwt_required()
+def markets_all():
+
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        market = s.query(Market).filter(Market.is_deleted!=1).all()
+        if len(market) < 1: 
+            return {
+                "message": "Markets is empty"
+            }, 404
+        
+        return {
+            "success": True,
+            "data": market
+        }
+    except Exception as e:
+        return {
+            "message": "error get products",
+            "error": (e)
+        }
+    finally:
+        s.close()
+
+@market_routes.route('/market/<id>', methods=['GET'])
+@jwt_required()
+def markets_by_id(id):
+     
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        markets = s.query(Market).filter(Market.is_deleted!=1).filter(Market.id == id).first()
+        if len(markets) < 1: 
+            return {
+                "message": "Markets is empty"
+            }, 404
+        
+        return {
+            "success": True,
+            "data": markets
+        }, 200
+    except Exception as e:
+        return {
+            "message": "error get markets",
+            "error": (e)
+        }, 500
+    finally:
+        s.close()
     
     
 
