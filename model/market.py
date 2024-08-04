@@ -1,6 +1,6 @@
 from sqlalchemy.sql import func 
-from sqlalchemy import String, DateTime, Enum, Boolean, Integer, Text, ForeignKey
-from sqlalchemy.orm import mapped_column, Relationship
+from sqlalchemy import String, DateTime, Integer, Text, ForeignKey
+from sqlalchemy.orm import mapped_column
 from model.base import Base
 
 class Market(Base):

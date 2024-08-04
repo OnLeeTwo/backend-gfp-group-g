@@ -1,18 +1,21 @@
 from flask import Blueprint, request
+from datetime import datetime, UTC
 
 from model.user import User
 from model.seller import Seller
 from model.token import TokenBlocklist
-
+from model.category import Category
 from nanoid import generate
 
 from connectors.mysql_connectors import connection
+from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
 from cerberus import Validator
 
 from validations.user_register import user_register_schema
 from validations.login import login_schema
+from validations.user_update import user_update_schema
 
 from flask_jwt_extended import (
     create_access_token,
@@ -24,7 +27,6 @@ from flask_jwt_extended import (
 )
 
 user_routes = Blueprint("user_routes", __name__)
-
 
 @user_routes.route("/users", methods=["POST"])
 def register_user():
@@ -48,13 +50,14 @@ def register_user():
         role = request.form["role"]
 
         check_email = s.query(User).filter(User.email == email).first()
+       
         if check_email:
             return {"error": "Email already exists"}, 409
 
         if role not in ["buyer", "seller"]:
             return {"error": "Invalid role. Must be 'buyer' or 'seller'"}, 400
 
-        new_user_id = f"U-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+        new_user_id = f"U-{generate(' 1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
 
         NewUser = User(
             user_id=new_user_id,
@@ -64,6 +67,7 @@ def register_user():
 
         NewUser.set_password(request.form["password"])
         s.add(NewUser)
+        s.flush()
 
         if role == "seller":
             new_seller_id = f"S-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
@@ -86,8 +90,8 @@ def register_user():
 def login():
     v = Validator(login_schema)
     request_body = {
-        "email": request.form.get("email"),
-        "password": request.form.get("password"),
+        "email": request.form["email"],
+        "password": request.form["password"],
     }
 
     if not v.validate(request_body):
@@ -98,12 +102,17 @@ def login():
 
     s.begin()
     try:
-
-        user = s.query(User).filter(User.email == request_body["email"]).first()
-
+        user = s.query(User).filter(User.email == request_body["email"]).filter(User.is_deleted != True).first()
+        
+        if user is None:
+            
+            return {"error": "Email not found"}, 404
         if user and user.check_password(request_body["password"]):
-            access_token = create_access_token(identity=user.user_id)
-            refresh_token = create_refresh_token(identity=user.user_id)
+            access_token = create_access_token(
+                identity=user,
+                additional_claims={"email": user.email, "user_id": user.user_id},
+            )
+            refresh_token = create_refresh_token(identity=user)
 
             return {
                 "message": "Login successful",
@@ -112,23 +121,26 @@ def login():
                 "user_id": user.user_id,
                 "role": user.role,
             }, 200
-
+            
         else:
+            s.rollback()
             return {"error": "Invalid email or password"}, 401
 
     except Exception as e:
+        s.rollback()
         print(f"Error during login: {e}")
         return {"error": "Failed to login, please try again later"}, 500
     finally:
         s.close()
 
 
-@user_routes.route("/users/", methods=["GET"])
+@user_routes.route("/users", methods=["GET"])
 @jwt_required()
 def get_user():
+  
     return (
         {
-            "user_id": current_user.id,
+            "user_id": current_user.user_id,
             "email": current_user.email,
             "role": current_user.role,
             "created_at": current_user.created_at,
@@ -136,6 +148,72 @@ def get_user():
             "profile_picture": current_user.profile_picture,
         }
     ), 200
+
+
+@user_routes.route("/users", methods=["PUT"])
+@jwt_required()
+def update_user():
+    v = Validator(user_update_schema)
+    request_body = {
+        "email": request.form["email"],
+        "password": request.form["password"],
+    }
+
+    if not v.validate(request_body):
+        return {"error": v.errors}, 400
+
+    current_user_id = get_jwt_identity()
+    Session = sessionmaker(connection)
+    s = Session()
+
+    s.begin()
+
+    try:
+        user = s.query(User).filter(User.user_id == current_user_id).first()
+        if not user:
+            return {"error": "User not found"}, 404
+
+        if "email" in request_body:
+            user.email = request_body["email"]
+        if "password" in request_body:
+            user.set_password(request_body["password"])
+
+        user.updated_at = func.now()
+
+        s.commit()
+        return {"message": "User updated successfully"}, 200
+    except Exception as e:
+        s.rollback()
+        print(f"Error updating user: {e}")
+        return {"error": "Failed to update user"}, 500
+    finally:
+        s.close()
+
+
+@user_routes.route("/users", methods=["DELETE"])
+@jwt_required()
+def delete_user():
+    current_user_id = get_jwt_identity()
+    Session = sessionmaker(connection)
+    s = Session()
+
+    s.begin()
+    try:
+        user = s.query(User).filter(User.user_id == current_user_id).first()
+        if not user:
+            return {"error": "User not found"}, 404
+
+        user.is_deleted = True
+        user.time_deleted = datetime.now(UTC)
+
+        s.commit()
+        return {"message": "User deleted successfully"}, 200
+    except Exception as e:
+        s.rollback()
+        print(f"Error deleting user: {e}")
+        return {"error": "Failed to delete user"}, 500
+    finally:
+        s.close()
 
 
 @user_routes.get("/refresh")
