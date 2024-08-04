@@ -157,11 +157,12 @@ def create_product():
     s.begin()
     try:
         current_user_id = get_jwt_identity()
+
+     
         product_name=request.form['product_name']
         price=request.form['price']
         stock=request.form['stock']
         category=request.form['category']
-        images=request.form['images']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
         # Kurang validasi untuk market. Dibuat jika market sudah ada
@@ -177,7 +178,19 @@ def create_product():
             s.flush()
         else:
             category_id = check_category.id
-        print(category_id)
+
+        images=''
+        if 'images' in request.files:
+            file = request.files['images']
+            if file.filename=='':
+                return {"error": "No selected file"}, 400
+            filename = file.filename
+            try:
+                file_url = upload_service.upload_file(file, filename)
+                images = file_url
+            except Exception as e:
+                return {"error": str(e)}, 500
+
         newProduct = Product(
             id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
             name=product_name,
