@@ -10,11 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
 from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
     jwt_required,
-    get_jwt,
-    get_jwt_identity,
     current_user,
 )
 
