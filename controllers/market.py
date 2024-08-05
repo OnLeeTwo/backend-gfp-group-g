@@ -8,16 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
-)
-
-from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
-    jwt_required,
-    get_jwt,
-    get_jwt_identity,
-    current_user,
-)
+)  
 
 
 market_routes = Blueprint("market_routes", __name__)
@@ -67,7 +58,6 @@ def create_market():
 @market_routes.route('/markets', methods=['GET'])
 @jwt_required()
 def markets_all():
-
     Session = sessionmaker(connection)
     s = Session()
     s.begin()
