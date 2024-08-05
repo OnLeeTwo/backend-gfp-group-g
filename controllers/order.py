@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from datetime import datetime
+from datetime import datetime, UTC
 
 from model.order import Order, OrderStatus, PaymentStatus
 from model.order_details import OrderDetails
@@ -51,7 +51,7 @@ def create_order():
             if not promotion:
                 return {"error": "Invalid promotion code"}, 400
 
-            current_date = datetime.now()
+            current_date = datetime.now(UTC)
             if current_date < promotion.start_date or current_date > promotion.end_date:
                 return {"error": "Promotion code has expired"}, 400
 
