@@ -1,19 +1,73 @@
 from flask import Blueprint, request
 from model.product import Product
 from model.category import Category
-from datetime import datetime
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
+import os
+from services.upload import UploadService
+from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
 )
 
+import os
+
+
+# Upload to R2
+R2_ACCESS_KEY_ID=os.getenv('R2_ACCESS_KEY_ID')
+R2_SECRET_ACCESS_KEY=os.getenv('R2_SECRET_ACCESS_KEY')
+R2_BUCKET_NAME=os.getenv('R2_BUCKET_NAME')
+R2_ENDPOINT_URL=os.getenv('R2_ENDPOINT_URL')
+R2_TOKEN=os.getenv('R2_TOKEN')
+upload_service = UploadService(R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME)
+
+
 product_routes = Blueprint("product_routes", __name__)
 
-# create function to assign category. User
+UPLOAD_FOLDER = 'static/upload/products'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+
+@product_routes.route('/upload_r2', methods=['POST'])
+def upload_image():
+    if 'file' not in request.files:
+        return {"error": "No file part"}, 400
+    file = request.files['file']
+    if file.filename == '':
+        return {"error": "No selected file"}, 400
+
+    filename = file.filename
+    try:
+        file_url = upload_service.upload_file(file, filename)
+        return {"message": "File uploaded successfully", "url": file_url}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@product_routes.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return {
+            "error": "No File part"
+        }, 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return {"error": "No selected file"}, 400
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        return {"message": "File successfully uploaded", "filename": filename}, 200
+    
+    return {"error": "File type not allowed"}, 400
 
 
 
@@ -97,17 +151,18 @@ def product_by_id(id):
 @product_routes.route('/product', methods=['POST'])
 @jwt_required()
 def create_product():
-
+    
     Session = sessionmaker(connection)
     s = Session()
     s.begin()
     try:
         current_user_id = get_jwt_identity()
+
+     
         product_name=request.form['product_name']
         price=request.form['price']
         stock=request.form['stock']
         category=request.form['category']
-        images=request.form['images']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
         # Kurang validasi untuk market. Dibuat jika market sudah ada
@@ -123,7 +178,19 @@ def create_product():
             s.flush()
         else:
             category_id = check_category.id
-        print(category_id)
+
+        images=''
+        if 'images' in request.files:
+            file = request.files['images']
+            if file.filename=='':
+                return {"error": "No selected file"}, 400
+            filename = file.filename
+            try:
+                file_url = upload_service.upload_file(file, filename)
+                images = file_url
+            except Exception as e:
+                return {"error": str(e)}, 500
+
         newProduct = Product(
             id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
             name=product_name,

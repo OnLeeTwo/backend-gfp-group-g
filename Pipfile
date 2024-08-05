@@ -14,12 +14,6 @@ python-dotenv = "*"
 mysql-connector-python = "*"
 
 [dev-packages]
-flask = "*"
-sqlalchemy = "*"
-mysql-connector-python = "*"
-python-dotenv = "*"
-bcrypt = "*"
-flask-jwt-extended = "*"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

@@ -4,12 +4,7 @@ from sqlalchemy import Select
 from connectors.mysql_connectors import connection
 from model.category import Category
 from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
     jwt_required,
-    get_jwt,
-    get_jwt_identity,
-    current_user,
 )
 
 category_routes = Blueprint("category_routes", __name__)
