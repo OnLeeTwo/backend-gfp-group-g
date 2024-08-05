@@ -14,6 +14,7 @@ from model.token import TokenBlocklist
 from controllers.user import user_routes
 from controllers.product import product_routes
 from controllers.category import category_routes
+from controllers.market import market_routes
 
 
 load_dotenv()
@@ -33,6 +34,7 @@ database = os.getenv("DB_DATABASE")
 app.register_blueprint(user_routes)
 app.register_blueprint(product_routes)
 app.register_blueprint(category_routes)
+app.register_blueprint(market_routes)
 
 
 @jwt.user_identity_loader

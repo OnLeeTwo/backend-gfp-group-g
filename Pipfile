@@ -11,16 +11,9 @@ cerberus = "*"
 flask-jwt-extended = "*"
 nanoid = "*"
 python-dotenv = "*"
-boto3 = "*"
 mysql-connector-python = "*"
 
 [dev-packages]
-flask = "*"
-sqlalchemy = "*"
-mysql-connector-python = "*"
-python-dotenv = "*"
-bcrypt = "*"
-flask-jwt-extended = "*"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

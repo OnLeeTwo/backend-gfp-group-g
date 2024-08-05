@@ -56,7 +56,7 @@ def register_user():
         if role not in ["buyer", "seller"]:
             return {"error": "Invalid role. Must be 'buyer' or 'seller'"}, 400
 
-        new_user_id = f"U-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+        new_user_id = f"U-{generate(' 1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
 
         NewUser = User(
             user_id=new_user_id,

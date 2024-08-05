@@ -11,3 +11,5 @@ class TokenBlocklist(Base):
     id = mapped_column(Integer, primary_key=True)
     jti = mapped_column(String, nullable=True)
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
