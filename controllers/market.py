@@ -30,25 +30,19 @@ def create_market():
 
         check_market = s.query(Seller).filter(Seller.user_id == market_seller).filter()
         if check_market is None:
-            return {
-                "error": "Seller not found"
-            }
-        user_check = s.query(User).filter(User.user_id) == Seller.user_id
-        if user_check:
-            return {
-                "error": "This not allowed"
-            } 
+            newMarket = Market(
+                market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
+                name = market_name,
+                seller_id = market_seller,
+                location = market_location,
+                created_by = current_user_id,
+                updated_by = current_user_id
+            )
+            s.add(newMarket)
+            s.commit()
+        else:
+            return {"error": "Seller does not exist"}, 400
         
-        newMarket = Market(
-            market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
-            name = market_name,
-            seller_id = market_seller,
-            location = market_location,
-            created_by = current_user_id,
-            updated_by = current_user_id
-        )
-        s.add(newMarket)
-        s.commit()
         return {
             "success": True,
             "message": "Success create market"
