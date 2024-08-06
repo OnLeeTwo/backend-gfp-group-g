@@ -12,6 +12,7 @@ flask-jwt-extended = "*"
 nanoid = "*"
 python-dotenv = "*"
 mysql-connector-python = "*"
+boto3 = "*"
 
 [dev-packages]
 

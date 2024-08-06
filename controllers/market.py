@@ -1,6 +1,8 @@
 from flask import Blueprint, request
 from model.market import Market
 from model.seller import Seller
+from model.user import User
+from sqlalchemy import func
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
@@ -26,12 +28,17 @@ def create_market():
         market_seller = request.form["seller_id"]
         market_location = request.form["location"]
 
-        check_market = s.query(Seller).filter(Seller.seller_id == market_seller).filter()
+        check_market = s.query(Seller).filter(Seller.user_id == market_seller).filter()
         if check_market is None:
             return {
                 "error": "Seller not found"
             }
-
+        user_check = s.query(User).filter(User.user_id) == Seller.user_id
+        if user_check:
+            return {
+                "error": "This not allowed"
+            } 
+        
         newMarket = Market(
             market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
             name = market_name,
@@ -41,7 +48,7 @@ def create_market():
             updated_by = current_user_id
         )
         s.add(newMarket)
-        s.commit
+        s.commit()
         return {
             "success": True,
             "message": "Success create market"
@@ -49,20 +56,20 @@ def create_market():
     except Exception as e:
         s.rollback()
         return {
-            "message": "error create product",
+            "message": "error create market",
             "error": e
         }, 500
     finally:
         s.close()
 
 @market_routes.route('/markets', methods=['GET'])
-@jwt_required()
 def markets_all():
     Session = sessionmaker(connection)
     s = Session()
     s.begin()
     try:
         markets =[]
+        print(markets)
         data = s.query(Market).filter(Market.is_deleted==0).all()
         for row in data:
             seller = s.query(Seller).filter(Seller.seller_id == row.seller_id).first()
@@ -87,5 +94,67 @@ def markets_all():
             "message": "error get market",
             "error": (e)
         }
+    finally:
+        s.close()
+
+@market_routes.route('/markets/<id>', methods=['GET'])
+def market_by_id(id):
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        market = []
+        markets = s.query(market_routes).filter(Market.market_id== id).filter(Market.is_deleted==0).first()
+        if markets is None:
+            return {
+                "message": "market not found"
+            }, 404
+        category = s.query(Seller).filter(Seller.seller_id==markets.seller_id).first()
+        market.append({
+            "market_id": markets.market_id,
+            "seller_id": markets.seller_id,
+            "name" : markets.name,
+            "location": markets.location,
+        })
+        
+        return {
+            "success": True,
+            "data": market
+        }, 200
+    except Exception as e:
+        s.rollback()
+        return {
+            "message": "error get markets",
+            "error": (e)
+        }, 500
+    finally:
+        s.close()
+
+@market_routes.route('/markets/<id>', methods=["DELETE"])
+@jwt_required()
+def delete_product(id):
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        market = s.query(Market).filter(Market.market_id==id).filter(Market.is_deleted==0).first()
+        if market is None:
+            return {
+                "message": "market not found"
+            }, 404
+        market.is_deleted = 1
+        market.time_deleted = func.now()
+        s.commit()
+        return {
+            "success": True,
+            "message": "Success delete market"
+        }, 200
+        
+    except Exception as e:
+        s.rollback()
+        return {
+            "message": "error delete market",
+            "error": (e)
+        }, 500
     finally:
         s.close()
