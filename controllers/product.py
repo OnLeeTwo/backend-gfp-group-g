@@ -72,7 +72,6 @@ def upload_file():
 
 
 @product_routes.route('/products', methods=['GET'])
-@jwt_required()
 def products_all():
 
     Session = sessionmaker(connection)
@@ -88,6 +87,7 @@ def products_all():
                 "id": row.id,
                 "product_name": row.name,
                 "price": row.price,
+                "images": row.images,
                 "stock": row.stock,
                 "category": category.name,
                 "is_premium": row.is_premium
@@ -111,7 +111,6 @@ def products_all():
         s.close()
 
 @product_routes.route('/product/<id>', methods=['GET'])
-@jwt_required()
 def product_by_id(id):
      
     Session = sessionmaker(connection)
@@ -130,6 +129,7 @@ def product_by_id(id):
             "product_name": products.name,
             "price": products.price,
             "stock": products.stock,
+            "images": products.images,
             "category": category.name,
             "is_premium": products.is_premium
         })
@@ -184,12 +184,18 @@ def create_product():
             file = request.files['images']
             if file.filename=='':
                 return {"error": "No selected file"}, 400
-            filename = file.filename
-            try:
-                file_url = upload_service.upload_file(file, filename)
-                images = file_url
-            except Exception as e:
-                return {"error": str(e)}, 500
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                try:
+                    file_url = upload_service.upload_file(file, filename)
+                    images = file_url
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {
+                    "error": "file type not allowed"
+                }, 415 
 
         newProduct = Product(
             id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
