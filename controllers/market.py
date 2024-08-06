@@ -28,20 +28,30 @@ def create_market():
         market_seller = request.form["seller_id"]
         market_location = request.form["location"]
 
-        check_market = s.query(Seller).filter(Seller.user_id == market_seller).filter()
-        if check_market is None:
+        check_market = s.query(Seller).filter(Seller.seller_id == market_seller).first()
+        user_market = s.query(User).filter(User.user_id == Seller.user_id).first()
+        if check_market:
+            newMarket = Market(
+                market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
+                name = market_name,
+                seller_id = market_seller,
+                location = market_location,
+                created_by = current_user_id,
+                updated_by = current_user_id
+            )
+        elif user_market:
+            newMarket = Market(
+                market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
+                name = market_name,
+                seller_id = market_seller,
+                location = market_location,
+                created_by = current_user_id,
+                updated_by = current_user_id
+            )
+        else:
             return {
                 "error": "Seller not found"
-            }
-        
-        newMarket = Market(
-            market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
-            name = market_name,
-            seller_id = market_seller,
-            location = market_location,
-            created_by = current_user_id,
-            updated_by = current_user_id
-        )
+                }
         s.add(newMarket)
         s.commit()
         return {
