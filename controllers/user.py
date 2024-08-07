@@ -1,20 +1,23 @@
 from flask import Blueprint, request
 from datetime import datetime, UTC
+import os
 
 from model.user import User
 from model.seller import Seller
 from model.token import TokenBlocklist
-from nanoid import generate
+
+from validations.user_register import user_register_schema
+from validations.login import login_schema
+from validations.user_update import user_update_schema
 
 from connectors.mysql_connectors import connection
 from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
+from services.upload import UploadService
+from werkzeug.utils import secure_filename
+from nanoid import generate
 from cerberus import Validator
-
-from validations.user_register import user_register_schema
-from validations.login import login_schema
-from validations.user_update import user_update_schema
 
 from flask_jwt_extended import (
     create_access_token,
@@ -26,6 +29,16 @@ from flask_jwt_extended import (
 )
 
 user_routes = Blueprint("user_routes", __name__)
+
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
+R2_TOKEN = os.getenv("R2_TOKEN")
+upload_service = UploadService(
+    R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME
+)
+
 
 @user_routes.route("/users", methods=["POST"])
 def register_user():
@@ -49,7 +62,7 @@ def register_user():
         role = request.form["role"]
 
         check_email = s.query(User).filter(User.email == email).first()
-       
+
         if check_email:
             return {"error": "Email already exists"}, 409
 
@@ -101,15 +114,24 @@ def login():
 
     s.begin()
     try:
-        user = s.query(User).filter(User.email == request_body["email"]).filter(User.is_deleted != True).first()
-        
+        user = (
+            s.query(User)
+            .filter(User.email == request_body["email"])
+            .filter(User.is_deleted != True)
+            .first()
+        )
+
         if user is None:
-            
+
             return {"error": "Email not found"}, 404
         if user and user.check_password(request_body["password"]):
             access_token = create_access_token(
                 identity=user,
-                additional_claims={"email": user.email, "user_id": user.user_id},
+                additional_claims={
+                    "email": user.email,
+                    "user_id": user.user_id,
+                    "role": user.role,
+                },
             )
             refresh_token = create_refresh_token(identity=user)
 
@@ -120,7 +142,7 @@ def login():
                 "user_id": user.user_id,
                 "role": user.role,
             }, 200
-            
+
         else:
             s.rollback()
             return {"error": "Invalid email or password"}, 401
@@ -136,7 +158,7 @@ def login():
 @user_routes.route("/users", methods=["GET"])
 @jwt_required()
 def get_user():
-  
+
     return (
         {
             "user_id": current_user.user_id,
@@ -178,6 +200,17 @@ def update_user():
             user.set_password(request_body["password"])
 
         user.updated_at = func.now()
+
+        if "images" in request.files:
+            file = request.files["images"]
+            if file.filename == "":
+                return {"error": "No selected file"}, 400
+            filename = file.filename
+            try:
+                file_url = upload_service.upload_file(file, filename)
+                user.profile_picture = file_url
+            except Exception as e:
+                return {"error": str(e)}, 500
 
         s.commit()
         return {"message": "User updated successfully"}, 200

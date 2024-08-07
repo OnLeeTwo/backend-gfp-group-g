@@ -1,7 +1,7 @@
 from model.base import Base
 
 from sqlalchemy.orm import mapped_column
-from sqlalchemy import Integer, String
+from sqlalchemy import String
 
 
 class Seller(Base):
@@ -10,7 +10,3 @@ class Seller(Base):
     seller_id = mapped_column(String(10), primary_key=True)
     user_id = mapped_column(String(10), nullable=False)
 
-from model.base import Base
-
-from sqlalchemy.orm import mapped_column
-from sqlalchemy import Integer, String
