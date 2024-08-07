@@ -1,7 +1,7 @@
 from model.base import Base
 
 from sqlalchemy.orm import mapped_column
-from sqlalchemy import Integer, String
+from sqlalchemy import String
 
 
 class Seller(Base):
