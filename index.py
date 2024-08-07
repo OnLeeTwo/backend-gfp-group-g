@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 from dotenv import load_dotenv
 from datetime import timedelta
 from sqlalchemy.exc import SQLAlchemyError
@@ -20,6 +21,7 @@ from controllers.market import market_routes
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
@@ -87,10 +89,9 @@ def token_in_blocklist_callback(jwt_header, jwt_data):
     jti = jwt_data["jti"]
 
     token = s.query(TokenBlocklist).filter(TokenBlocklist.jti == jti).scalar()
-    
+
     s.close()
     return token is not None
-
 
 
 @app.route("/")
