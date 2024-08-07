@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from model.market import Market
 from model.seller import Seller
 from model.user import User
@@ -73,17 +73,17 @@ def markets_all():
     s = Session()
     s.begin()
     try:
-        markets =[]
-        print(markets)
-        data = s.query(Market).filter(Market.is_deleted==0).all()
+        markets = []
+        data = s.query(Market).all()
         for row in data:
             seller = s.query(Seller).filter(Seller.seller_id == row.seller_id).first()
-            markets.append({
-                "market_id": row.market_id,
-                "seller_id": seller.seller_id,
-                "market_name": row.name,
-                "location": row.location,
-            })
+            if seller:
+                markets.append({
+                    "market_id": row.market_id,
+                    "seller_id": seller.seller_id,
+                    "market_name": row.name,
+                    "location": row.location,
+                })
         if len(markets) < 1: 
             return {
                 "message": "Market is empty"
@@ -95,10 +95,10 @@ def markets_all():
         }, 200
     except Exception as e:
         s.rollback()
-        return {
-            "message": "error get market",
-            "error": (e)
-        }
+        return jsonify({
+            "message": "error get markets",
+            "error": str(e)  # Convert exception to string
+        }), 500
     finally:
         s.close()
 
@@ -108,32 +108,70 @@ def market_by_id(id):
     s = Session()
     s.begin()
     try:
-        market = []
-        markets = s.query(market_routes).filter(Market.market_id== id).filter(Market.is_deleted==0).first()
-        if markets is None:
+        market = s.query(Market).filter(Market.market_id == id).first()
+        if market:
+            seller = s.query(Seller).filter(Seller.seller_id == market.seller_id).first()
+            if seller:
+                return jsonify({
+                    "market_id": market.market_id,
+                    "seller_id": seller.seller_id,
+                    "market_name": market.name,
+                    "location": market.location,
+                }), 200
+            else:
+                return {
+                    "message": "Seller not found"
+                }, 404
+        else:
             return {
-                "message": "market not found"
+                "message": "Market not found"
             }, 404
-        category = s.query(Seller).filter(Seller.seller_id==markets.seller_id).first()
-        market.append({
-            "market_id": markets.market_id,
-            "seller_id": markets.seller_id,
-            "name" : markets.name,
-            "location": markets.location,
-        })
-        
-        return {
-            "success": True,
-            "data": market
-        }, 200
     except Exception as e:
         s.rollback()
         return {
-            "message": "error get markets",
+            "message": "Error getting market",
+            "error": str(e)  # Convert exception to string
+        }, 500
+    finally:
+        s.close()
+
+@market_routes.route('/markets/<id>', methods=["PUT"])
+@jwt_required()
+def market_product(id):
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try: 
+        market = s.query(Market).filter(Market.market_id == id).first()
+        
+        if market is None:
+            return {
+                "message": "product not found"
+            }, 404
+        
+        current_user_id = get_jwt_identity()
+        name=request.form['name']
+        location=request.form['location']
+
+        
+        market.name=name
+        market.location=location
+        market.updated_by=current_user_id
+        
+        s.commit()
+        return {
+            "message": "Updated product success",
+            "success": True
+        },201
+    except Exception as e:
+        s.rollback()
+        return {
+            "message": "error update product",
             "error": (e)
         }, 500
     finally:
         s.close()
+    
 
 @market_routes.route('/markets/<id>', methods=["DELETE"])
 @jwt_required()
@@ -142,24 +180,23 @@ def delete_product(id):
     s = Session()
     s.begin()
     try:
-        market = s.query(Market).filter(Market.market_id==id).filter(Market.is_deleted==0).first()
+        market = s.query(Market).filter(Market.market_id == id).first()
         if market is None:
-            return {
-                "message": "market not found"
-            }, 404
-        market.is_deleted = 1
-        market.time_deleted = func.now()
+            return jsonify({
+                "message": "Market not found"
+            }), 404
+        s.delete(market)
         s.commit()
-        return {
+        return jsonify({
             "success": True,
             "message": "Success delete market"
-        }, 200
-        
+        }), 200
+
     except Exception as e:
         s.rollback()
-        return {
-            "message": "error delete market",
-            "error": (e)
-        }, 500
+        return jsonify({
+            "message": "Error deleting market",
+            "error": str(e)  # Convert exception to string
+        }), 500
     finally:
         s.close()
