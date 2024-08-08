@@ -4,6 +4,7 @@ from model.category import Category
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
+from model.market import Market
 import os
 from services.upload import UploadService
 from datetime import datetime
@@ -166,7 +167,14 @@ def create_product():
         category=request.form['category']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
-        # Kurang validasi untuk market. Dibuat jika market sudah ada
+
+
+        market = s.query(Market).filter(Market.market_id==market_id).first()
+        if market is None:
+            return {
+                "message": "Market not found, please check again"
+            }, 404
+
     
         check_category = s.query(Category).filter(Category.name == category).first()
         if check_category is None:
@@ -180,7 +188,7 @@ def create_product():
         else:
             category_id = check_category.id
 
-        images=''
+        
         product_id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
         if 'images' in request.files:
             file = request.files['images']
@@ -192,14 +200,9 @@ def create_product():
                 ext_name = os.path.splitext(filename)[1]
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                 new_filename = f"{product_id}-{timestamp}{ext_name}"
-
-
-              
-                print(new_filename)
-
+             
                 try:
-                    file_url = upload_service.upload_file(file, new_filename)
-                    images = file_url
+                    upload_service.upload_file(file, new_filename)
                 except Exception as e:
                     return {"error": str(e)}, 500
             else:
@@ -257,10 +260,16 @@ def update_product(id):
         price=request.form['price']
         stock=request.form['stock']
         category=request.form['category']
-        images=request.form['images']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
-        # Kurang validasi untuk market. Dibuat jika market sudah ada
+
+        new_filename=product.images
+        market = s.query(Market).filter(Market.market_id==market_id).first()
+        if market is None:
+            return {
+                "message": "Market not found, please check again"
+            }, 404
+       
     
         check_category = s.query(Category).filter(Category.name == category).first()
         if check_category is None:
@@ -274,12 +283,31 @@ def update_product(id):
         else:
             category_id = check_category.id
 
-       
+        if 'images' in request.files:
+            file = request.files['images']
+            if file.filename=='':
+                return {"error": "No selected file"}, 400
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{id}-{timestamp}{ext_name}"
+             
+                try:
+                    upload_service.upload_file(file, new_filename)
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {
+                    "error": "file type not allowed"
+                }, 415 
+            
         product.name=product_name
         product.price=float(price)
         product.stock=int(stock)
         product.category_id=category_id
-        product.images=images
+        product.images=new_filename
         product.is_premium=int(is_premium)
         product.market_id=market_id
         product.updated_by=current_user_id
