@@ -6,6 +6,7 @@ from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
 import os
 from services.upload import UploadService
+from datetime import datetime
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from flask_jwt_extended import (
@@ -21,7 +22,7 @@ R2_ACCESS_KEY_ID=os.getenv('R2_ACCESS_KEY_ID')
 R2_SECRET_ACCESS_KEY=os.getenv('R2_SECRET_ACCESS_KEY')
 R2_BUCKET_NAME=os.getenv('R2_BUCKET_NAME')
 R2_ENDPOINT_URL=os.getenv('R2_ENDPOINT_URL')
-R2_TOKEN=os.getenv('R2_TOKEN')
+R2_DOMAINS=os.getenv('R2_DOMAINS')
 upload_service = UploadService(R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME)
 
 
@@ -87,7 +88,7 @@ def products_all():
                 "id": row.id,
                 "product_name": row.name,
                 "price": row.price,
-                "images": row.images,
+                "images": f"{R2_DOMAINS}/{row.images}",
                 "stock": row.stock,
                 "category": category.name,
                 "is_premium": row.is_premium
@@ -129,7 +130,7 @@ def product_by_id(id):
             "product_name": products.name,
             "price": products.price,
             "stock": products.stock,
-            "images": products.images,
+            "images": f"{R2_DOMAINS}/{products.images}",
             "category": category.name,
             "is_premium": products.is_premium
         })
@@ -180,6 +181,7 @@ def create_product():
             category_id = check_category.id
 
         images=''
+        product_id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
         if 'images' in request.files:
             file = request.files['images']
             if file.filename=='':
@@ -187,8 +189,16 @@ def create_product():
             if file and allowed_file(file.filename):
 
                 filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{product_id}-{timestamp}{ext_name}"
+
+
+              
+                print(new_filename)
+
                 try:
-                    file_url = upload_service.upload_file(file, filename)
+                    file_url = upload_service.upload_file(file, new_filename)
                     images = file_url
                 except Exception as e:
                     return {"error": str(e)}, 500
@@ -198,12 +208,12 @@ def create_product():
                 }, 415 
 
         newProduct = Product(
-            id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
+            id=product_id,
             name=product_name,
             price=float(price),
             stock=int(stock),
             category_id=category_id,
-            images=images,
+            images=new_filename,
             is_premium=int(is_premium),
             market_id=market_id,
             is_deleted=0,
