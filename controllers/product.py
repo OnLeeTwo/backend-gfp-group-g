@@ -4,8 +4,10 @@ from model.category import Category
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
+from model.market import Market
 import os
 from services.upload import UploadService
+from datetime import datetime
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from flask_jwt_extended import (
@@ -21,7 +23,7 @@ R2_ACCESS_KEY_ID=os.getenv('R2_ACCESS_KEY_ID')
 R2_SECRET_ACCESS_KEY=os.getenv('R2_SECRET_ACCESS_KEY')
 R2_BUCKET_NAME=os.getenv('R2_BUCKET_NAME')
 R2_ENDPOINT_URL=os.getenv('R2_ENDPOINT_URL')
-R2_TOKEN=os.getenv('R2_TOKEN')
+R2_DOMAINS=os.getenv('R2_DOMAINS')
 upload_service = UploadService(R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME)
 
 
@@ -72,7 +74,6 @@ def upload_file():
 
 
 @product_routes.route('/products', methods=['GET'])
-@jwt_required()
 def products_all():
 
     Session = sessionmaker(connection)
@@ -88,6 +89,7 @@ def products_all():
                 "id": row.id,
                 "product_name": row.name,
                 "price": row.price,
+                "images": f"{R2_DOMAINS}/{row.images}",
                 "stock": row.stock,
                 "category": category.name,
                 "is_premium": row.is_premium
@@ -111,7 +113,6 @@ def products_all():
         s.close()
 
 @product_routes.route('/product/<id>', methods=['GET'])
-@jwt_required()
 def product_by_id(id):
      
     Session = sessionmaker(connection)
@@ -130,6 +131,7 @@ def product_by_id(id):
             "product_name": products.name,
             "price": products.price,
             "stock": products.stock,
+            "images": f"{R2_DOMAINS}/{products.images}",
             "category": category.name,
             "is_premium": products.is_premium
         })
@@ -146,7 +148,42 @@ def product_by_id(id):
         }, 500
     finally:
         s.close()
-   
+
+@product_routes.route('/products_market/<id>', methods=['GET'])
+
+def product_by_market_id(id):
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        data = s.query(Product).filter(Product.is_deleted==0).all()
+        # result = s.execute(data)
+        products = []
+        for row in data:
+            category = s.query(Category).filter(Category.id==row.category_id).first()
+            products.append({
+                "id": row.id,
+                "product_name": row.name,
+                "price": row.price,
+                "images": f"{R2_DOMAINS}/{row.images}",
+                "stock": row.stock,
+                "category": category.name,
+                "is_premium": row.is_premium
+            })
+        if len(products) < 1: 
+            return {
+                "message": "Products is empty"
+            }, 404
+        
+        return {
+            "success": True,
+            "data": products
+        }, 200
+    except Exception as e:
+        return {
+            "message": "Error handling server",
+            "error": (e)
+        }, 500
 
 @product_routes.route('/product', methods=['POST'])
 @jwt_required()
@@ -165,7 +202,14 @@ def create_product():
         category=request.form['category']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
-        # Kurang validasi untuk market. Dibuat jika market sudah ada
+
+
+        market = s.query(Market).filter(Market.market_id==market_id).first()
+        if market is None:
+            return {
+                "message": "Market not found, please check again"
+            }, 404
+
     
         check_category = s.query(Category).filter(Category.name == category).first()
         if check_category is None:
@@ -179,25 +223,35 @@ def create_product():
         else:
             category_id = check_category.id
 
-        images=''
+        
+        product_id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
         if 'images' in request.files:
             file = request.files['images']
             if file.filename=='':
                 return {"error": "No selected file"}, 400
-            filename = file.filename
-            try:
-                file_url = upload_service.upload_file(file, filename)
-                images = file_url
-            except Exception as e:
-                return {"error": str(e)}, 500
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{product_id}-{timestamp}{ext_name}"
+             
+                try:
+                    upload_service.upload_file(file, new_filename)
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {
+                    "error": "file type not allowed"
+                }, 415 
 
         newProduct = Product(
-            id=f"P-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
+            id=product_id,
             name=product_name,
             price=float(price),
             stock=int(stock),
             category_id=category_id,
-            images=images,
+            images=new_filename,
             is_premium=int(is_premium),
             market_id=market_id,
             is_deleted=0,
@@ -241,10 +295,16 @@ def update_product(id):
         price=request.form['price']
         stock=request.form['stock']
         category=request.form['category']
-        images=request.form['images']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
-        # Kurang validasi untuk market. Dibuat jika market sudah ada
+
+        new_filename=product.images
+        market = s.query(Market).filter(Market.market_id==market_id).first()
+        if market is None:
+            return {
+                "message": "Market not found, please check again"
+            }, 404
+       
     
         check_category = s.query(Category).filter(Category.name == category).first()
         if check_category is None:
@@ -258,12 +318,31 @@ def update_product(id):
         else:
             category_id = check_category.id
 
-       
+        if 'images' in request.files:
+            file = request.files['images']
+            if file.filename=='':
+                return {"error": "No selected file"}, 400
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{id}-{timestamp}{ext_name}"
+             
+                try:
+                    upload_service.upload_file(file, new_filename)
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {
+                    "error": "file type not allowed"
+                }, 415 
+            
         product.name=product_name
         product.price=float(price)
         product.stock=int(stock)
         product.category_id=category_id
-        product.images=images
+        product.images=new_filename
         product.is_premium=int(is_premium)
         product.market_id=market_id
         product.updated_by=current_user_id
