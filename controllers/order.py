@@ -103,7 +103,44 @@ def get_all_orders():
                     "total_amount": order.total_amount,
                     "status_order": order.status_order.value,
                     "status_payment": order.status_payment.value,
-                    "created_at": order.created_at.isoformat(),
+                    "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "shipping_address": order.shipping_address,
+                    "promotion_id": order.promotion_id,
+                }
+            )
+
+        return orders_data, 200
+
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    finally:
+        s.close()
+
+
+@order_routes.route("/order", methods=["GET"])
+@jwt_required()
+def get_all_orders_buyers_only():
+    Session = sessionmaker(connection)
+    s = Session()
+
+    try:
+        role = current_user.role
+        user_id = current_user.user_id
+
+        if role is not "buyer":
+            return {"error": "Only buyer can access this routes!"}, 400
+
+        orders = s.query(Order).filter(Order.user_id == user_id).all()
+        orders_data = []
+        for order in orders:
+            orders_data.append(
+                {
+                    "order_id": order.order_id,
+                    "total_amount": order.total_amount,
+                    "status_order": order.status_order.value,
+                    "status_payment": order.status_payment.value,
+                    "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                     "shipping_address": order.shipping_address,
                     "promotion_id": order.promotion_id,
                 }
@@ -166,7 +203,44 @@ def get_order_by_id(order_id):
         s.close()
 
 
-@order_routes.route("/orders/<string:order_id>/cancel", methods=["POST"])
+@order_routes.route("/orders/<string:order_id>", methods=["PUT"])
+@jwt_required()
+def update_order(order_id):
+    Session = sessionmaker(connection)
+    s = Session()
+
+    request_body = {
+        "status_payment": request.form["email"],
+        "status_order": request.form["password"],
+    }
+
+    try:
+        user_id = current_user.user_id
+        order = (
+            s.query(Order)
+            .filter(Order.user_id == user_id, Order.order_id == order_id)
+            .first()
+        )
+
+        if not order:
+            return {"error": "Order not found"}, 404
+
+        order.status_order = request_body["status_order"]
+        order.status_payment = request_body["status_payment"]
+
+        s.commit()
+
+        return {"message": "Order cancelled successfully"}, 200
+
+    except Exception as e:
+        s.rollback()
+        return {"error": str(e)}, 500
+
+    finally:
+        s.close()
+
+
+@order_routes.route("/orders/<string:order_id>/cancel", methods=["PUT"])
 @jwt_required()
 def cancel_order(order_id):
     Session = sessionmaker(connection)
