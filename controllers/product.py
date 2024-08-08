@@ -148,7 +148,42 @@ def product_by_id(id):
         }, 500
     finally:
         s.close()
-   
+
+@product_routes.route('/products_market/<id>', methods=['GET'])
+
+def product_by_market_id(id):
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        data = s.query(Product).filter(Product.is_deleted==0).all()
+        # result = s.execute(data)
+        products = []
+        for row in data:
+            category = s.query(Category).filter(Category.id==row.category_id).first()
+            products.append({
+                "id": row.id,
+                "product_name": row.name,
+                "price": row.price,
+                "images": f"{R2_DOMAINS}/{row.images}",
+                "stock": row.stock,
+                "category": category.name,
+                "is_premium": row.is_premium
+            })
+        if len(products) < 1: 
+            return {
+                "message": "Products is empty"
+            }, 404
+        
+        return {
+            "success": True,
+            "data": products
+        }, 200
+    except Exception as e:
+        return {
+            "message": "Error handling server",
+            "error": (e)
+        }, 500
 
 @product_routes.route('/product', methods=['POST'])
 @jwt_required()
