@@ -5,9 +5,10 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, current_user
 
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
+import os
 
 wishlist_routes = Blueprint('wishlist_routes', __name__)
-
+R2_DOMAINS=os.getenv('R2_DOMAINS')
 @wishlist_routes.route('/wishlist', methods=['GET'])
 @jwt_required()
 def show_wishist():
@@ -25,18 +26,24 @@ def show_wishist():
                 "message": "Wishlist empty"
             }, 404
         
-        for row in get_withlist: 
-            product = s.query(Product).filter(Product.id==row.id).first()
-            wishlist.append({
-                "id": row.id,
-                "user_id": row.user_id,
-                "product": product
-            })
         
+       
+        for row in get_withlist: 
+            products = s.query(Product).filter(Product.id==row.product_id).first()
+          
+            wishlist.append({
+                "name":products.name,
+                "price": products.price,
+                "stock": products.stock,
+                "images": f"{R2_DOMAINS}/{products.images}"
+            })
+
+        
+        # print(wishlist)
         return {
             "title": "Fetching wishlist",
             "message": "Success get wishlist",
-            "product": product
+            "wishlist": wishlist
         }, 200
     except Exception as e:
         return {
@@ -93,5 +100,28 @@ def create_wishlist():
             "message": (e)
         }, 500
     
+    finally:
+        s.close()
+
+@wishlist_routes.route('/wishlist', methods=['DELETE'])
+@jwt_required()
+def remove_wishlist():
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try: 
+        wishlist_id = request.form['id']
+        wishlist = s.query(Wishlist).filter(Wishlist.id==wishlist_id).first()
+        s.delete(wishlist)
+        s.commit()
+        return {
+            "message": "wishlist removed"
+        }, 200
+    except Exception as e:
+        s.rollback()
+        return {
+            "title": "Error handling server",
+            "message": (e)
+        }, 500
     finally:
         s.close()
