@@ -15,7 +15,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
 from services.upload import UploadService
-from werkzeug.utils import secure_filename
 from nanoid import generate
 from cerberus import Validator
 

@@ -2,7 +2,6 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 from datetime import timedelta
-from sqlalchemy.exc import SQLAlchemyError
 import os
 
 from flask_jwt_extended import JWTManager
@@ -16,12 +15,14 @@ from controllers.user import user_routes
 from controllers.product import product_routes
 from controllers.category import category_routes
 from controllers.market import market_routes
+from controllers.wishlist import wishlist_routes
 
 
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+host_url = os.getenv("HOST_URL")
+CORS(app, origins=[host_url], supports_credentials=True)
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
@@ -37,6 +38,7 @@ app.register_blueprint(user_routes)
 app.register_blueprint(product_routes)
 app.register_blueprint(category_routes)
 app.register_blueprint(market_routes)
+app.register_blueprint(wishlist_routes)
 
 
 @jwt.user_identity_loader
