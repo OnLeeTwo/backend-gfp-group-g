@@ -32,8 +32,6 @@ def create_market():
         # Pastikan bahwa user tersebut adalah seller. cara ceknya adalah mengecek di table seller
         check_market = s.query(Seller).filter(Seller.user_id == user_id).first()
         
-
-        
         if check_market is None:
             return {
                 "error": "Seller not found"
@@ -145,8 +143,12 @@ def market_product(id):
     s = Session()
     s.begin()
     try: 
+        user_id=current_user.user_id
+        log_manager = LogManager(user_id=user_id, action='UPDATE_MARKET')
         market = s.query(Market).filter(Market.market_id == id).first()
-        
+        market_dict = vars(market)
+        market_str = str({key: value for key, value in market_dict.items() if not key.startswith('_')})
+     
         if market is None:
             return {
                 "message": "product not found"
@@ -161,7 +163,13 @@ def market_product(id):
         market.location=location
         market.updated_by=current_user_id
         
+
+        market_dict = market.__dict__
+        market_dict = {key: value for key, value in market_dict.items() if not key.startswith('_')}
         s.commit()
+        log_manager.set_before(before_data=market_str)
+        log_manager.set_after(after_data=str(market_dict))
+        log_manager.save()
         return {
             "message": "Updated product success",
             "success": True
@@ -170,7 +178,7 @@ def market_product(id):
         s.rollback()
         return {
             "message": "error update product",
-            "error": (e)
+            "error": str(e)
         }, 500
     finally:
         s.close()
@@ -183,18 +191,26 @@ def delete_product(id):
     s = Session()
     s.begin()
     try:
+        log_manager = LogManager(user_id=current_user.user_id, action="DELETE_MARKET")
         market = s.query(Market).filter(Market.market_id == id).first()
         if market is None:
             return jsonify({
                 "message": "Market not found"
             }), 404
+        market_dict = vars(market)
+        market_str = str({key: value for key, value in market_dict.items() if not key.startswith('_')})
         s.delete(market)
         s.commit()
+
+        log_manager.set_before(before_data=market_str)
+        log_manager.save()
         return jsonify({
             "success": True,
             "message": "Success delete market"
         }), 200
 
+
+     
     except Exception as e:
         s.rollback()
         return jsonify({

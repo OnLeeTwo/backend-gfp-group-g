@@ -31,7 +31,7 @@ class LogManager:
             db.commit()
         except Exception as e:
             db.rollback()
-            print(str(e))
+            print(f"ERROR: {str(e)}")
         finally:
             db.close()
 

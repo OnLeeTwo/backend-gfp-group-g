@@ -12,7 +12,7 @@ class Market(Base):
     location = mapped_column(Text, nullable=True)
     created_at = mapped_column(DateTime, nullable=False, server_default=func.now())
     created_by = mapped_column(Integer, nullable=False)
-    updated_at = mapped_column(DateTime, nullable=True, server_default=func.now())
+    updated_at = mapped_column(DateTime, onupdate=func.now())
     updated_by = mapped_column(Integer, nullable=True)
     profile_picture = mapped_column(Text, nullable=True)
 
