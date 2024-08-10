@@ -13,6 +13,7 @@ nanoid = "*"
 python-dotenv = "*"
 mysql-connector-python = "*"
 boto3 = "*"
+flask_cors="*"
 
 [dev-packages]
 flask = "*"

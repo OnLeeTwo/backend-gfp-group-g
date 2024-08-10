@@ -10,6 +10,7 @@ class Promotion(Base):
     market_id = mapped_column(String(10), nullable=False)
     code = mapped_column(String(255), unique=True, nullable=False)
     discount_value = mapped_column(DECIMAL, nullable=False)
+    created_by=mapped_column(String(10))
     created_at = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

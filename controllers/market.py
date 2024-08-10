@@ -6,10 +6,12 @@ from sqlalchemy import func
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
+from services.logActions import LogManager
 
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
+    current_user
 )  
 
 
@@ -23,46 +25,47 @@ def create_market():
     s = Session()
     s.begin()
     try:
-        current_user_id = get_jwt_identity()
+        user_id=current_user.user_id
         market_name = request.form["name"]
         market_seller = request.form["seller_id"]
         market_location = request.form["location"]
+        # Pastikan bahwa user tersebut adalah seller. cara ceknya adalah mengecek di table seller
+        check_market = s.query(Seller).filter(Seller.user_id == user_id).first()
+        
 
-        check_market = s.query(Seller).filter(Seller.seller_id == market_seller).first()
-        user_market = s.query(User).filter(User.user_id == Seller.user_id).first()
-        if check_market:
-            newMarket = Market(
-                market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
-                name = market_name,
-                seller_id = market_seller,
-                location = market_location,
-                created_by = current_user_id,
-                updated_by = current_user_id
-            )
-        elif user_market:
-            newMarket = Market(
-                market_id = f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}",
-                name = market_name,
-                seller_id = market_seller,
-                location = market_location,
-                created_by = current_user_id,
-                updated_by = current_user_id
-            )
-        else:
+        
+        if check_market is None:
             return {
                 "error": "Seller not found"
-                }
+                }, 404
+         
+        id=f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+        newMarket = Market(
+            market_id = id,
+            name = market_name,
+            seller_id = market_seller,
+            location = market_location,
+            created_by = user_id,
+            updated_by = user_id
+        )
+
+        market_dict = newMarket.__dict__
+        market_dict = {key: value for key, value in market_dict.items() if not key.startswith('_')}
         s.add(newMarket)
         s.commit()
+        log_manager = LogManager(user_id=user_id, action='CREATE_MARKET')
+        log_manager.set_after(after_data=str(market_dict))
+        log_manager.save()
         return {
             "success": True,
-            "message": "Success create market"
+            "message": "Success create market",
+            "market": market_dict
         }, 201
     except Exception as e:
         s.rollback()
         return {
             "message": "error create market",
-            "error": e
+            "error": str(e)
         }, 500
     finally:
         s.close()

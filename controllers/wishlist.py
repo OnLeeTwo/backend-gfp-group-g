@@ -103,15 +103,14 @@ def create_wishlist():
     finally:
         s.close()
 
-@wishlist_routes.route('/wishlist', methods=['DELETE'])
-@jwt_required()
+@wishlist_routes.route('/wishlist/<int:id>', methods=['DELETE'])
+@jwt_required(id)
 def remove_wishlist():
     Session = sessionmaker(connection)
     s = Session()
     s.begin()
     try: 
-        wishlist_id = request.form['id']
-        wishlist = s.query(Wishlist).filter(Wishlist.id==wishlist_id).first()
+        wishlist = s.query(Wishlist).filter(Wishlist.id==id).first()
         s.delete(wishlist)
         s.commit()
         return {

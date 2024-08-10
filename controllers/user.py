@@ -78,7 +78,6 @@ def register_user():
 
         NewUser.set_password(request.form["password"])
         s.add(NewUser)
-        s.flush()
 
         if role == "seller":
             new_seller_id = f"S-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"

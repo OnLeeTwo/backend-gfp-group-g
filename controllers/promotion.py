@@ -31,6 +31,7 @@ def create_promotion():
             promotion_id=new_promotion_id,
             code=request.form["code"],
             discount_value=request.form["discount_value"],
+            created_by=current_user.user_id,
             start_date=datetime.fromisoformat(request.form["start_date"]),
             end_date=datetime.fromisoformat(request.form["end_date"]),
         )
@@ -40,7 +41,7 @@ def create_promotion():
 
         return {
             "message": "Promotion created successfully",
-            "promotion_id": new_promotion.id,
+            "promotion_id": new_promotion.promotion_id,
         }, 201
 
     except Exception as e:
@@ -73,6 +74,9 @@ def get_all_promotions():
             }
             for promo in promotions
         ]
+
+        if len(promotions_data) < 1:
+            return {"error": "promotion not found"}, 404
 
         return promotions_data, 200
 
@@ -133,7 +137,7 @@ def update_promotion(promotion_id):
         promotion = (
             s.query(Promotion)
             .filter(
-                Promotion.id == promotion_id,
+                Promotion.promotion_id == promotion_id,
                 Promotion.market_id == market_id,
             )
             .first()
