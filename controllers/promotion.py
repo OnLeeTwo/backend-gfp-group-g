@@ -2,11 +2,10 @@ from flask import Blueprint, request
 from datetime import datetime
 
 from model.promotion import Promotion
-
+from services.logActions import LogManager
 from nanoid import generate
 
 from connectors.mysql_connectors import connection
-from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
 from flask_jwt_extended import (
@@ -22,10 +21,10 @@ promotion_routes = Blueprint("promotion_routes", __name__)
 def create_promotion():
     Session = sessionmaker(connection)
     s = Session()
-
+    s.begin()
     try:
         new_promotion_id = f"PR-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
-
+        log_manager = LogManager(user_id=current_user.user_id, action='CREATE_PROMOTION')
         new_promotion = Promotion(
             market_id=request.form["market_id"],
             promotion_id=new_promotion_id,
@@ -35,9 +34,12 @@ def create_promotion():
             start_date=datetime.fromisoformat(request.form["start_date"]),
             end_date=datetime.fromisoformat(request.form["end_date"]),
         )
-
+        promotion_dict = new_promotion.__dict__
+        promotion_dict = str({key: value for key, value in promotion_dict.items() if not key.startswith('_')})
         s.add(new_promotion)
+        log_manager.set_after(after_data=promotion_dict)
         s.commit()
+        log_manager.save()
 
         return {
             "message": "Promotion created successfully",
@@ -145,7 +147,10 @@ def update_promotion(promotion_id):
 
         if not promotion:
             return {"error": "Promotion not found"}, 404
-
+        log_manager = LogManager(user_id=current_user.user_id, action='UPDATE_PROMOTION')
+        promotion_dict = vars(promotion)
+        promotion_str = str({key: value for key, value in promotion_dict.items() if not key.startswith('_')})
+        log_manager.set_before(before_data=promotion_str)
         if "code" in request.form:
             promotion.code = request.form["code"]
 
@@ -158,8 +163,11 @@ def update_promotion(promotion_id):
         if "end_date" in request.form:
             promotion.end_date = datetime.fromisoformat(request.form["end_date"])
 
+        promotion_dict = promotion.__dict__
+        promotion_dict = str({key: value for key, value in promotion_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=promotion_dict)
         s.commit()
-
+        log_manager.save()
         return {"message": "Promotion updated successfully"}, 200
 
     except ValueError as ve:
@@ -184,18 +192,20 @@ def delete_promotion(promotion_id):
         promotion = (
             s.query(Promotion)
             .filter(
-                Promotion.id == promotion_id,
-                Promotion.market_id == current_user.market_id,
+                Promotion.promotion_id == promotion_id
             )
             .first()
         )
 
         if not promotion:
             return {"error": "Promotion not found"}, 404
-
+        promotion_dict = vars(promotion)
+        promotion_str = str({key: value for key, value in promotion_dict.items() if not key.startswith('_')})
+        log_manager=LogManager(user_id=current_user.user_id, action='DELETE_PROMOTION')
+        log_manager.set_before(before_data=promotion_str)
         s.delete(promotion)
         s.commit()
-
+        log_manager.save()
         return {"message": "Promotion deleted successfully"}, 200
 
     except Exception as e:
