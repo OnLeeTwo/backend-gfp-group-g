@@ -4,7 +4,7 @@ from datetime import datetime, UTC
 from model.order import Order, OrderStatus, PaymentStatus
 from model.order_details import OrderDetails
 from model.promotion import Promotion
-
+from services.logActions import LogManager
 from nanoid import generate
 
 from connectors.mysql_connectors import connection
@@ -37,7 +37,7 @@ def create_order():
             return {"error": "No item in cart!"}, 400
 
         new_order_id = f"O-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
-
+        log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
         total_amount = sum(detail.total_price for detail in order_details)
 
         promotion_code = request.form["code"]
@@ -73,8 +73,11 @@ def create_order():
         for detail in order_details:
             detail.order_id = new_order_id
 
+        order_dict = NewOrder.__dict__
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=order_dict)
         s.commit()
-
+        log_manager.save()
         return {"message": "Order created successfully", "order_id": new_order_id}, 201
 
     except Exception as e:
@@ -224,12 +227,17 @@ def update_order(order_id):
 
         if not order:
             return {"error": "Order not found"}, 404
-
+        log_manager = LogManager(user_id=user_id, action='UPDATE_ORDER')
+        order_dict = vars(order)
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_before(before_data=order_dict)
         order.status_order = request_body["status_order"]
         order.status_payment = request_body["status_payment"]
-
+        order_dict = vars(order)
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=order_dict)
         s.commit()
-
+        log_manager.save()
         return {"message": "Order cancelled successfully"}, 200
 
     except Exception as e:
@@ -248,6 +256,7 @@ def cancel_order(order_id):
 
     try:
         user_id = current_user.user_id
+        log_manager = LogManager(user_id=user_id,action='CANCEL_ORDER')
         order = (
             s.query(Order)
             .filter(Order.user_id == user_id, Order.order_id == order_id)
@@ -256,14 +265,19 @@ def cancel_order(order_id):
 
         if not order:
             return {"error": "Order not found"}, 404
-
+        order_dict = vars(order)
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_before(before_data=order_dict)
         if order.status_order != OrderStatus.pending:
             return {"error": "Only pending orders can be cancelled"}, 400
 
         order.status_order = OrderStatus.cancelled
 
+        order_dict = vars(order)
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=order_dict)
         s.commit()
-
+        log_manager.save()
         return {"message": "Order cancelled successfully"}, 200
 
     except Exception as e:

@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from model.order_details import OrderDetails
 from model.product import Product
+from services.logActions import LogManager
 
 from connectors.mysql_connectors import connection
 
@@ -21,7 +22,7 @@ def create_order_details():
     try:
         product_id = request.form["product_id"]
         product = s.query(Product).filter(Product.id == product_id).first()
-
+        log_manager = LogManager(user_id=get_jwt_identity(), action='CREATE_ORDER_DETAIL')
         if not product:
             return {"error": "Product not found"}, 404
 
@@ -40,6 +41,9 @@ def create_order_details():
 
         s.add(new_order)
         s.commit()
+        order_dict = new_order.__dict__
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=order_dict)
         return {
             "message": "Order details created",
             "order_details_id": new_order.order_details_id,
@@ -127,7 +131,10 @@ def update_order_details(order_details_id):
             )
             .first()
         )
-
+        log_manager = LogManager(user_id=user_id,action='UPDATE_ORDER_DETAIL')
+        order_dict = vars(order)
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_before(before_data=order_dict)
         order.order_id = request.form["order_id"]
 
         if "quantity" in request.form:
@@ -140,7 +147,11 @@ def update_order_details(order_details_id):
             except ValueError:
                 return {"error": "Invalid value for quantity"}, 400
 
+        order_dict = vars(order)
+        order_dict = str({key:value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=order_dict)
         s.commit()
+        log_manager.save()
         return {"message": "Order details updated successfully"}, 200
 
     except Exception as e:
@@ -158,11 +169,15 @@ def delete_order_details(order_details_id):
     s.begin()
     try:
         order = s.query(OrderDetails).get(order_details_id)
+        log_manager=LogManager(user_id=get_jwt_identity(), action='DELETE_ORDER_DETAIL')
         if not order:
             return {"message": "Order not found"}, 404
-
+        order_dict = vars(order)
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startwith('_')})
+        log_manager.set_before(before_data=order_dict)
         s.delete(order)
         s.commit()
+        log_manager.save()
         return {"message": "Order details deleted"}, 200
     except Exception as e:
         s.rollback()
