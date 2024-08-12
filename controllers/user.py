@@ -30,12 +30,8 @@ from flask_jwt_extended import (
     decode_token,
 )
 
-R2_DOMAINS = os.getenv("R2_DOMAINS")
-
-
-R2_DOMAINS = os.getenv("R2_DOMAINS")
-
 user_routes = Blueprint("user_routes", __name__)
+R2_DOMAINS = os.getenv("R2_DOMAINS")
 upload_service = UploadService()
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
