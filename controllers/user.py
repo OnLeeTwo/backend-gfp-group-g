@@ -10,11 +10,12 @@ from validations.user_register import user_register_schema
 from validations.login import login_schema
 from validations.user_update import user_update_schema
 
+from services.upload import UploadService
+
 from connectors.mysql_connectors import connection
 from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
-from services.upload import UploadService
 from nanoid import generate
 from cerberus import Validator
 
@@ -33,10 +34,16 @@ R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
 R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
-R2_TOKEN = os.getenv("R2_TOKEN")
+R2_DOMAINS = os.getenv("R2_DOMAINS")
 upload_service = UploadService(
     R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME
 )
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @user_routes.route("/users", methods=["POST"])
@@ -199,16 +206,23 @@ def update_user():
 
         user.updated_at = func.now()
 
-        if "images" in request.files:
-            file = request.files["images"]
+        if "profile_picture" in request.files:
+            file = request.files["profile_picture"]
             if file.filename == "":
                 return {"error": "No selected file"}, 400
-            filename = file.filename
-            try:
-                file_url = upload_service.upload_file(file, filename)
-                user.profile_picture = file_url
-            except Exception as e:
-                return {"error": str(e)}, 500
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{user.user_id}-{timestamp}{ext_name}"
+
+                try:
+                    upload_service.upload_file(file, new_filename)
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {"error": "file type not allowed"}, 415
 
         s.commit()
         return {"message": "User updated successfully"}, 200
