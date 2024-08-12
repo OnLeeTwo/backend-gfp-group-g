@@ -9,6 +9,8 @@ from connectors.mysql_connectors import connection
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
+from nanoid import generate
+
 order_details_routes = Blueprint("order_details_routes", __name__)
 
 
@@ -20,20 +22,35 @@ def create_order_details():
     s.begin()
 
     try:
+        user_id = get_jwt_identity()
         product_id = request.form["product_id"]
         product = s.query(Product).filter(Product.id == product_id).first()
-        log_manager = LogManager(user_id=get_jwt_identity(), action='CREATE_ORDER_DETAIL')
+        log_manager = LogManager(
+            user_id=get_jwt_identity(), action="CREATE_ORDER_DETAIL"
+        )
+
         if not product:
             return {"error": "Product not found"}, 404
 
         product_price = product.price
         quantity = int(request.form["quantity"])
 
+        if quantity <= 0:
+            return {"error": "Quantity must be greater than 0"}, 400
+
+        if quantity > product.stock:
+            return {"error": "Not enough stock"}, 400
+
         total_price = quantity * product_price
 
+        new_order_details_id = (
+            f"OD-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+        )
+
         new_order = OrderDetails(
+            order_details_id=new_order_details_id,
             order_id=request.form["order_id"],
-            user_id=request.form["user_id"],
+            user_id=user_id,
             product_id=product_id,
             quantity=quantity,
             total_price=total_price,
@@ -42,7 +59,9 @@ def create_order_details():
         s.add(new_order)
         s.commit()
         order_dict = new_order.__dict__
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_after(after_data=order_dict)
         return {
             "message": "Order details created",
@@ -131,9 +150,11 @@ def update_order_details(order_details_id):
             )
             .first()
         )
-        log_manager = LogManager(user_id=user_id,action='UPDATE_ORDER_DETAIL')
+        log_manager = LogManager(user_id=user_id, action="UPDATE_ORDER_DETAIL")
         order_dict = vars(order)
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_before(before_data=order_dict)
         order.order_id = request.form["order_id"]
 
@@ -148,7 +169,9 @@ def update_order_details(order_details_id):
                 return {"error": "Invalid value for quantity"}, 400
 
         order_dict = vars(order)
-        order_dict = str({key:value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_after(after_data=order_dict)
         s.commit()
         log_manager.save()
@@ -169,11 +192,15 @@ def delete_order_details(order_details_id):
     s.begin()
     try:
         order = s.query(OrderDetails).get(order_details_id)
-        log_manager=LogManager(user_id=get_jwt_identity(), action='DELETE_ORDER_DETAIL')
+        log_manager = LogManager(
+            user_id=get_jwt_identity(), action="DELETE_ORDER_DETAIL"
+        )
         if not order:
             return {"message": "Order not found"}, 404
         order_dict = vars(order)
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startwith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startwith("_")}
+        )
         log_manager.set_before(before_data=order_dict)
         s.delete(order)
         s.commit()
