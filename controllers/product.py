@@ -1,23 +1,22 @@
 from flask import Blueprint, request
 from model.product import Product
 from model.category import Category
+from model.seller import Seller
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
 from model.market import Market
 import os
 from services.upload import UploadService
+from services.logActions import LogManager
 from datetime import datetime
-from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
+    current_user
 )
-
 import os
-
-
 # Upload to R2
 R2_ACCESS_KEY_ID=os.getenv('R2_ACCESS_KEY_ID')
 R2_SECRET_ACCESS_KEY=os.getenv('R2_SECRET_ACCESS_KEY')
@@ -29,48 +28,10 @@ upload_service = UploadService(R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOI
 
 product_routes = Blueprint("product_routes", __name__)
 
-UPLOAD_FOLDER = 'static/upload/products'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-
-@product_routes.route('/upload_r2', methods=['POST'])
-def upload_image():
-    if 'file' not in request.files:
-        return {"error": "No file part"}, 400
-    file = request.files['file']
-    if file.filename == '':
-        return {"error": "No selected file"}, 400
-
-    filename = file.filename
-    try:
-        file_url = upload_service.upload_file(file, filename)
-        return {"message": "File uploaded successfully", "url": file_url}, 200
-    except Exception as e:
-        return {"error": str(e)}, 500
-
-
-@product_routes.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return {
-            "error": "No File part"
-        }, 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return {"error": "No selected file"}, 400
-
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-        return {"message": "File successfully uploaded", "filename": filename}, 200
-    
-    return {"error": "File type not allowed"}, 400
-
 
 
 @product_routes.route('/products', methods=['GET'])
@@ -156,7 +117,7 @@ def product_by_market_id(id):
     s = Session()
     s.begin()
     try:
-        data = s.query(Product).filter(Product.is_deleted==0).all()
+        data = s.query(Product).filter(Product.is_deleted==0, Product.market_id==id).all()
         # result = s.execute(data)
         products = []
         for row in data:
@@ -194,15 +155,21 @@ def create_product():
     s.begin()
     try:
         current_user_id = get_jwt_identity()
+        
+        is_seller = s.query(Seller).filter(Seller.user_id==current_user_id).first()
+        if is_seller is None:
+            return {
+                "message": "You are not seller"
+            }, 403
 
-     
+        log_manager = LogManager(user_id=current_user_id, action="CREATE_PRODUCT")
         product_name=request.form['product_name']
         price=request.form['price']
         stock=request.form['stock']
         category=request.form['category']
         is_premium=request.form['is_premium']
         market_id=request.form['market_id']
-
+        new_filename=''
 
         market = s.query(Market).filter(Market.market_id==market_id).first()
         if market is None:
@@ -258,8 +225,13 @@ def create_product():
             created_by=current_user_id,
             updated_by=current_user_id
         )
+
+        product_dict = newProduct.__dict__
+        product_dict = {key: value for key, value in product_dict.items() if not key.startswith('_')}
         s.add(newProduct)
         s.commit()
+        log_manager.set_after(after_data=str(product_dict))
+        log_manager.save()
         return {
             "success": True,
             "message": "Success create product"
@@ -269,7 +241,7 @@ def create_product():
         s.rollback()
         return {
             "message": "error create product",
-            "error": e
+            "error": str(e)
         }, 500
     finally:
         s.close()
@@ -289,8 +261,11 @@ def update_product(id):
                 "message": "product not found"
             }, 404
         category_id =''
-        
         current_user_id = get_jwt_identity()
+        log_manager = LogManager(user_id=current_user_id, action='UPDATE_PRODUCT')
+        product_dict = vars(product)
+        product_str= str({key: value for key, value in product_dict.items()if not key.startswith('_')})
+        log_manager.set_before(before_data=product_str)
         product_name=request.form['product_name']
         price=request.form['price']
         stock=request.form['stock']
@@ -347,7 +322,11 @@ def update_product(id):
         product.market_id=market_id
         product.updated_by=current_user_id
         
+        product_dict = product.__dict__
+        product_dict = str({key: value for key, value in product_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=product_dict)
         s.commit()
+        log_manager.save()
         return {
             "message": "Updated product success",
             "success": True
@@ -356,7 +335,7 @@ def update_product(id):
         s.rollback()
         return {
             "message": "error update product",
-            "error": (e)
+            "error": str(e)
         }, 500
     finally:
         s.close()
@@ -368,15 +347,24 @@ def delete_product(id):
     s = Session()
     s.begin()
     try:
+        log_manager = LogManager(user_id=get_jwt_identity(), action='DELETE_PRODUCT')
         product = s.query(Product).filter(Product.id==id).filter(Product.is_deleted==0).first()
         if product is None:
             return {
                 "message": "product not found"
             }, 404
+        product_dict = vars(product)
+        product_str = str({key: value for key, value in product_dict.items() if not key.startswith('_')})
+
+        log_manager.set_before(before_data=product_str)
         product.is_deleted = 1
         product.time_deleted = func.now()
-      
+
+        product_dict = product.__dict__
+        product_dict = str({key: value for key, value in product_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=product_dict)
         s.commit()
+        log_manager.save()
         return {
             "success": True,
             "message": "Success delete product"
@@ -386,7 +374,7 @@ def delete_product(id):
         s.rollback()
         return {
             "message": "error delete product",
-            "error": (e)
+            "error": str(e)
         }, 500
     finally:
         s.close()

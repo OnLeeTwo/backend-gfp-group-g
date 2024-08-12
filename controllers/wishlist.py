@@ -1,7 +1,8 @@
 from flask import Blueprint, request
 from model.wishllist import Wishlist
 from model.product import Product
-from flask_jwt_extended import jwt_required, get_jwt_identity, current_user
+from flask_jwt_extended import jwt_required, current_user
+from services.logActions import LogManager
 
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
@@ -64,10 +65,10 @@ def create_wishlist():
         
         product_id = request.form['product_id']
         print(user_id)
-
-        check_product = s.query(Product).filter(Product.id==product_id).first()
+        log_manager = LogManager(user_id=current_user.user_id, action='CREATE_WISHLIST')
+        check_product = s.query(Product).filter(Product.id==product_id, Product.is_deleted==0).first()
         print(check_product)
-      
+
         if check_product is None: 
             return {
                 "title": "add a new wishlist",
@@ -87,8 +88,13 @@ def create_wishlist():
             product_id=product_id
         )
 
+
         s.add(add_wishlist)
+        wishlist_dict = add_wishlist.__dict__
+        wishlist_dict = str({key: value for key, value in wishlist_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=wishlist_dict)
         s.commit()
+        log_manager.save()
         return {
             "message": "Successfully add new wishlist",
             "title": "add a new wishlist"
@@ -97,23 +103,27 @@ def create_wishlist():
         s.rollback()
         return {
             "title": "Error handling server",
-            "message": (e)
+            "message": str(e)
         }, 500
     
     finally:
         s.close()
 
-@wishlist_routes.route('/wishlist', methods=['DELETE'])
+@wishlist_routes.route('/wishlist/<int:id>', methods=['DELETE'])
 @jwt_required()
-def remove_wishlist():
+def remove_wishlist(id):
     Session = sessionmaker(connection)
     s = Session()
     s.begin()
     try: 
-        wishlist_id = request.form['id']
-        wishlist = s.query(Wishlist).filter(Wishlist.id==wishlist_id).first()
+        Log_manager = LogManager(user_id=current_user.user_id, action='DELETE_WISHLIST')
+        wishlist = s.query(Wishlist).filter(Wishlist.id==id).first()
+        wishlist_dict = vars(wishlist)
+        wishlist_dict = str({key: value for key, value in wishlist_dict.items() if not key.startswith('_')})
         s.delete(wishlist)
+        Log_manager.set_before(before_data=wishlist_dict)
         s.commit()
+        Log_manager.save()
         return {
             "message": "wishlist removed"
         }, 200
@@ -121,7 +131,7 @@ def remove_wishlist():
         s.rollback()
         return {
             "title": "Error handling server",
-            "message": (e)
+            "message": str(e)
         }, 500
     finally:
         s.close()

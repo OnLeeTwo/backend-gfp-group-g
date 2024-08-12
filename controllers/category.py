@@ -3,14 +3,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import Select
 from connectors.mysql_connectors import connection
 from model.category import Category
-from flask_jwt_extended import (
-    jwt_required,
-)
 
 category_routes = Blueprint("category_routes", __name__)
 
 @category_routes.route('/categories', methods=['GET'])
-@jwt_required()
 def category_all():
     Session = sessionmaker(connection)
     s = Session()
@@ -35,13 +31,12 @@ def category_all():
     except Exception as e: 
         return {
             "message": "Error handling category",
-            "error": (e)
+            "error": str(e)
         }, 500
     finally:
         s.close()
 
 @category_routes.route('/category/<id>', methods=['GET'])
-@jwt_required()
 def category_by_id(id):
     Session = sessionmaker(connection)
     s = Session()
@@ -65,7 +60,7 @@ def category_by_id(id):
     except Exception as e: 
         return {
             "message": "Error handling category",
-            "error": (e)
+            "error": str(e)
         }, 500
     finally:
         s.close()
