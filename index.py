@@ -22,11 +22,11 @@ load_dotenv()
 
 app = Flask(__name__)
 host_url = os.getenv("HOST_URL")
-CORS(app, origins=[host_url], supports_credentials=True)
+CORS(app)
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 username = os.getenv("DB_USERNAME")

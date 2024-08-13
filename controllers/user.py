@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, make_response
 from datetime import datetime, UTC
 import os
 
@@ -163,17 +163,16 @@ def login():
 @user_routes.route("/users", methods=["GET"])
 @jwt_required()
 def get_user():
-
-    return (
-        {
-            "user_id": current_user.user_id,
-            "email": current_user.email,
-            "role": current_user.role,
-            "created_at": current_user.created_at,
-            "updated_at": current_user.updated_at,
-            "profile_picture": current_user.profile_picture,
-        }
-    ), 200
+    data = {
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "role": current_user.role,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+        "profile_picture": current_user.profile_picture,
+        "address": current_user.address,
+    }
+    return {"success": "data fetched successfully", "data": data}, 200
 
 
 @user_routes.route("/users", methods=["PUT"])
@@ -183,6 +182,7 @@ def update_user():
     request_body = {
         "email": request.form["email"],
         "password": request.form["password"],
+        "address": request.form["address"],
     }
 
     if not v.validate(request_body):
@@ -203,6 +203,8 @@ def update_user():
             user.email = request_body["email"]
         if "password" in request_body:
             user.set_password(request_body["password"])
+        if "address" in request_body:
+            user.address = request_body["address"]
 
         user.updated_at = func.now()
 
