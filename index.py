@@ -22,12 +22,12 @@ from controllers.order import order_routes
 load_dotenv()
 
 app = Flask(__name__)
-cors_origin = os.getenv("CORS_ORIGIN")
-CORS(app, resources={r"/*": {"origins": cors_origin}})
+host_url = os.getenv("HOST_URL")
+CORS(app)
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 username = os.getenv("DB_USERNAME")
