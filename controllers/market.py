@@ -7,14 +7,21 @@ from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
 from services.logActions import LogManager
-
+from services.upload import UploadService
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
     current_user
 )  
 
+import os
+from datetime import datetime
+upload_service = UploadService()
+R2_DOMAINS=os.getenv('R2_DOMAINS')
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 market_routes = Blueprint("market_routes", __name__)
 
 @market_routes.route('/markets', methods=['POST'])
@@ -38,10 +45,30 @@ def create_market():
                 }, 404
          
         id=f"M-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+
+        new_filename=""
+        if "images" in request.files:
+            file = request.files["images"]
+            if file.filename == "":
+                return {"error": "No selected file"}, 400
+            if file and allowed_file(file.filename):
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{id}-{timestamp}{ext_name}"
+                try:    
+                    upload_service.upload_file(file, new_filename)
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {"error": "file type not allowed"}, 415
+
+
         newMarket = Market(
             market_id = id,
             name = market_name,
             seller_id = market_seller,
+            profile_picture=new_filename,
             location = market_location,
             created_by = user_id,
             updated_by = user_id
@@ -83,6 +110,7 @@ def markets_all():
                     "market_id": row.market_id,
                     "seller_id": seller.seller_id,
                     "market_name": row.name,
+                    "profile_pict": f"{R2_DOMAINS}/{row.profile_picture}",
                     "location": row.location,
                 })
         if len(markets) < 1: 
@@ -162,6 +190,25 @@ def market_product(id):
         market.name=name
         market.location=location
         market.updated_by=current_user_id
+
+        new_filename = market.profile_picture
+        if "images" in request.files:
+            file = request.files["images"]
+            if file.filename == "":
+                return {"error": "No selected file"}, 400
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{id}-{timestamp}{ext_name}"
+
+                try:
+                    upload_service.upload_file(file, new_filename)
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {"error": "file type not allowed"}, 415
         
 
         market_dict = market.__dict__

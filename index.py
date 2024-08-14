@@ -21,8 +21,8 @@ from controllers.promotion import promotion_routes
 load_dotenv()
 
 app = Flask(__name__)
-host_url = os.getenv("HOST_URL")
-CORS(app, origins=[host_url], supports_credentials=True)
+cors_origin = os.getenv("CORS_ORIGIN")
+CORS(app, resources={r"/*": {"origins": cors_origin}})
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")

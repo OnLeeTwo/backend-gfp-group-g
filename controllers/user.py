@@ -1,7 +1,5 @@
 from flask import Blueprint, request
 from datetime import datetime, UTC
-import os
-
 from model.user import User
 from model.seller import Seller
 from model.token import TokenBlocklist
@@ -17,7 +15,7 @@ from sqlalchemy.orm import sessionmaker
 from services.upload import UploadService
 from nanoid import generate
 from cerberus import Validator
-
+import os
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -27,17 +25,10 @@ from flask_jwt_extended import (
     current_user,
 )
 
+R2_DOMAINS=os.getenv('R2_DOMAINS')
+
 user_routes = Blueprint("user_routes", __name__)
-
-R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
-R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
-R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
-R2_TOKEN = os.getenv("R2_TOKEN")
-upload_service = UploadService(
-    R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME
-)
-
+upload_service = UploadService()
 
 @user_routes.route("/users", methods=["POST"])
 def register_user():
@@ -164,7 +155,7 @@ def get_user():
             "role": current_user.role,
             "created_at": current_user.created_at,
             "updated_at": current_user.updated_at,
-            "profile_picture": current_user.profile_picture,
+            "profile_picture": f"{R2_DOMAINS}/{current_user.profile_picture}",
         }
     ), 200
 

@@ -11,22 +11,13 @@ from services.upload import UploadService
 from services.logActions import LogManager
 from datetime import datetime
 from sqlalchemy import func
-from flask_jwt_extended import jwt_required, get_jwt_identity, current_user
-import os
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
-# Upload to R2
-R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
-R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
-R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
-R2_DOMAINS = os.getenv("R2_DOMAINS")
-upload_service = UploadService(
-    R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME
-)
 
+upload_service = UploadService()
 
 product_routes = Blueprint("product_routes", __name__)
-
+R2_DOMAINS=os.getenv('R2_DOMAINS')
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
 
@@ -46,10 +37,14 @@ def products_all():
         # result = s.execute(data)
         for row in data:
             category = s.query(Category).filter(Category.id == row.category_id).first()
+            MarketName = s.query(Market).filter(Market.market_id == row.market_id).first()
             products.append(
                 {
                     "id": row.id,
                     "product_name": row.name,
+                    "description": row.description,
+                    "market_id": row.market_id,
+                    "market_name": MarketName.name,
                     "price": row.price,
                     "images": f"{R2_DOMAINS}/{row.images}",
                     "stock": row.stock,
@@ -90,6 +85,7 @@ def product_by_id(id):
                 "id": products.id,
                 "market_id": products.market_id,
                 "product_name": products.name,
+                "description": products.description,
                 "price": products.price,
                 "stock": products.stock,
                 "images": f"{R2_DOMAINS}/{products.images}",
@@ -125,7 +121,9 @@ def product_by_market_id(id):
                 {
                     "id": row.id,
                     "product_name": row.name,
+                    "market_id": row.market_id,
                     "price": row.price,
+                    "description": row.description,
                     "images": f"{R2_DOMAINS}/{row.images}",
                     "stock": row.stock,
                     "category": category.name,
@@ -156,6 +154,7 @@ def create_product():
 
         log_manager = LogManager(user_id=current_user_id, action="CREATE_PRODUCT")
         product_name = request.form["product_name"]
+        description = request.form['description']
         price = request.form["price"]
         stock = request.form["stock"]
         category = request.form["category"]
@@ -199,6 +198,7 @@ def create_product():
             id=product_id,
             name=product_name,
             price=float(price),
+            description=description,
             stock=int(stock),
             category_id=category_id,
             images=new_filename,
@@ -252,6 +252,7 @@ def update_product(id):
         product_name = request.form["product_name"]
         price = request.form["price"]
         stock = request.form["stock"]
+        description = request.form['description']
         category = request.form["category"]
         is_premium = request.form["is_premium"]
         market_id = request.form["market_id"]
@@ -289,6 +290,7 @@ def update_product(id):
                 return {"error": "file type not allowed"}, 415
 
         product.name = product_name
+        product.description = description
         product.price = float(price)
         product.stock = int(stock)
         product.category_id = category_id
