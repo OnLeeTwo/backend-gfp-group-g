@@ -1,7 +1,7 @@
 from model.base import Base
 
 from sqlalchemy.sql import func
-from sqlalchemy import String, DateTime, Enum, Boolean
+from sqlalchemy import String, DateTime, Enum, Boolean, JSON
 from sqlalchemy.orm import mapped_column
 import bcrypt
 
@@ -10,9 +10,11 @@ class User(Base):
     __tablename__ = "users"
 
     user_id = mapped_column(String(10), primary_key=True)
+    name = mapped_column(String(100), nullable=False)
     email = mapped_column(String(100), nullable=False)
     password_hash = mapped_column(String(255), nullable=False)
     role = mapped_column(Enum("buyer", "seller", name="role"), nullable=False)
+    address = mapped_column(JSON, nullable=True)
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     is_deleted = mapped_column(Boolean, default=False)
