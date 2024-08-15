@@ -8,9 +8,7 @@ database = os.getenv("DB_DATABASE")
 
 print("Connecting to MySQL Database")
 engine = create_engine(
-    f"mysql+mysqlconnector://{username}:{password}@{host}/{database}",
-    pool_pre_ping=True,
-    echo=True,
+    f"mysql+mysqlconnector://{username}:{password}@{host}/{database}"
 )
 
 connection = engine.connect()

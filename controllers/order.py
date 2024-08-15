@@ -35,8 +35,6 @@ def create_order():
     s.begin()
     try:
         user_id = current_user.user_id
-        id = f"O-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
-       
         carts = request.form.get('cart')
 
         # Check Product in cart have an enough stock
@@ -70,53 +68,63 @@ def create_order():
             promotion_id = promotion.promotion_id
         
 
-        order = check_cart.SumOrderDetail(discount_value)
-        data = {
-            "order_id": order
-        }
-        total_sum = sum(float(order["total_price"]) for order in data["order_id"])
-       
+        data = check_cart.SumOrderDetail(discount_value)
         log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
-        NewOrder = Order(
-            user_id=user_id,
-            order_id=id,
-            total_amount=total_sum,
-            status_order=OrderStatus.pending,
-            status_payment=PaymentStatus.pending,
-            shipping_address=request.form["shipping_address"],
-            promotion_id=promotion_id,
-            created_by=user_id
-        )
 
-        s.add(NewOrder)
+        for market_id, details in data.items():
+            amount = details["amount"]
+            order_details = details["order_details"]
+            tax = details["tax"]
+            shipping_fee = details["shipping_fee"]
+            admin_fee = details["admin_fee"]
 
-        transformed_data = [
-            {
-                "order_details_id": item["order_id"],
-                "order_id": id,
-                "product_id": item["product_id"],
-                "quantity": item["quantity"],
-                "total_price": item["total_price"],
-                "user_id": user_id
-            }
-            for item in data["order_id"]
-        ]
+            # Generate the order ID for the market
+            id = f"O-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+    
+            print(f"Market ID: {market_id}")
+            print(f"Amount: {amount}")
+            print(f"Order id:{id}")
+    
+            # Create the new order
+            NewOrder = Order(
+                user_id=user_id,
+                order_id=id,
+                total_amount=amount,
+                tax=tax,
+                shipping_fee=shipping_fee,
+                admin_fee=admin_fee,
+                status_order=OrderStatus.pending,
+                status_payment=PaymentStatus.pending,
+                shipping_address=request.form["shipping_address"],
+                promotion_id=promotion_id,
+                created_by=user_id
+            )
 
-        s.bulk_insert_mappings(OrderDetails, transformed_data)
+            s.add(NewOrder)
+            transformed_data = [
+                {
+                    "order_details_id": item["order_id"],
+                    "order_id": id,
+                    "product_id": item["product_id"],
+                    "quantity": item["quantity"],
+                    "total_price": item["total_price"],
+                    "user_id": user_id
+                }
+                for item in order_details
+            ]
+            s.bulk_insert_mappings(OrderDetails, transformed_data)
 
 
-       
-
+        # Update product qty
         order_dict = NewOrder.__dict__
         order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
         log_manager.set_after(after_data=order_dict)
+        
         s.commit()
         log_manager.save()
-        return {"message": "Order created successfully", "order_id": new_order_id}, 201
+
         return {
-            "success": True,
-            "order_id": id,
-            "data": transformed_data
+            "success": True
         }, 201
 
     except Exception as e:
