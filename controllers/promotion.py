@@ -25,6 +25,12 @@ def create_promotion():
     try:
         new_promotion_id = f"PR-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
         log_manager = LogManager(user_id=current_user.user_id, action='CREATE_PROMOTION')
+        check_code = s.query(Promotion).filter(Promotion.code==request.form['code']).first()
+        if check_code is not None:
+            return {
+                "message": "code is exists",
+                "success": False
+            }, 404
         new_promotion = Promotion(
             market_id=request.form["market_id"],
             promotion_id=new_promotion_id,

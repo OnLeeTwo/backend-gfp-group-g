@@ -17,6 +17,7 @@ from controllers.category import category_routes
 from controllers.market import market_routes
 from controllers.wishlist import wishlist_routes
 from controllers.promotion import promotion_routes
+from controllers.order import order_routes
 
 load_dotenv()
 
@@ -40,6 +41,7 @@ app.register_blueprint(category_routes)
 app.register_blueprint(market_routes)
 app.register_blueprint(wishlist_routes)
 app.register_blueprint(promotion_routes)
+app.register_blueprint(order_routes)
 
 
 @jwt.user_identity_loader
