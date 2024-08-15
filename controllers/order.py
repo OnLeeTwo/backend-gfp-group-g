@@ -3,7 +3,6 @@ from datetime import datetime, UTC
 
 from model.order import Order, OrderStatus, PaymentStatus
 from model.order_details import OrderDetails
-from model.product import Product
 from model.promotion import Promotion
 from services.logActions import LogManager
 from nanoid import generate
@@ -46,7 +45,7 @@ def create_order():
                 "message": "cart is empty"
             }, 400
         check_cart = OrderCheck(carts)
-        print(check_cart)
+       
         if check_cart is None: 
             return {
                 "message": "Quantities more than stock "
@@ -77,15 +76,7 @@ def create_order():
         }
         total_sum = sum(float(order["total_price"]) for order in data["order_id"])
        
-    
-        
-
-      
-
-     
-        # log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
-        # total_amount = sum(detail.total_price for detail in order_details)
-
+        log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
         NewOrder = Order(
             user_id=user_id,
             order_id=id,
@@ -116,12 +107,12 @@ def create_order():
 
        
 
-        # order_dict = NewOrder.__dict__
-        # order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
-        # log_manager.set_after(after_data=order_dict)
+        order_dict = NewOrder.__dict__
+        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        log_manager.set_after(after_data=order_dict)
         s.commit()
-        # log_manager.save()
-        # return {"message": "Order created successfully", "order_id": new_order_id}, 201
+        log_manager.save()
+        return {"message": "Order created successfully", "order_id": new_order_id}, 201
         return {
             "success": True,
             "order_id": id,

@@ -4,6 +4,7 @@ from model.category import Category
 from model.seller import Seller
 from nanoid import generate
 from connectors.mysql_connectors import connection
+from services.order_check import OrderCheck
 from sqlalchemy.orm import sessionmaker
 from model.market import Market
 import os
@@ -365,3 +366,30 @@ def delete_product(id):
         return {"message": "error delete product", "error": str(e)}, 500
     finally:
         s.close()
+
+
+@product_routes.route("/product/cart", methods=["GET"])
+@jwt_required()
+def show_cart():
+   
+    try:
+        carts = request.args.get('carts', '')
+        check_cart = OrderCheck(carts)
+       
+        if check_cart is None: 
+            return {
+                "message": "Quantities more than stock "
+            }, 400
+        
+        product_on_cart = check_cart.showProductOnCart()
+        return {
+            "product_on_cart": product_on_cart
+        }, 200
+
+    except Exception as e:
+       
+        return {
+            "error": str(e)
+        }, 500
+    
+    

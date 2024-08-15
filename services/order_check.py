@@ -1,9 +1,13 @@
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
 from model.product import Product
+from model.category import Category
 from decimal import Decimal
 import json
+import os
 from nanoid import generate
+
+R2_DOMAINS = os.getenv("R2_DOMAINS")
 class OrderCheck:
     def __init__(self, cart):
         self.cart = cart
@@ -66,6 +70,36 @@ class OrderCheck:
         finally:
             db.close()
 
+    def showProductOnCart(self):
+        Session = sessionmaker(connection)
+        db = Session()
+        db.begin()
+
+        try:
+            products = []
+            for market in self.carts:
+                product = db.query(Product).filter(Product.id == self.carts[market][0]["product_id"]).first()
+                category = db.query(Category).filter(Category.id==product.category_id).first()
+               
+                products.append({
+                    "id": product.id,
+                    "market_id": product.market_id,
+                    "product_name": product.name,
+                    "description": product.description,
+                    "price": product.price,
+                    "stock": product.stock,
+                    "images": f"{R2_DOMAINS}/{product.images}",
+                    "category": category.name,
+                    "is_premium": product.is_premium,
+                })
+            
+            return products
+
+        except Exception as e:
+            db.rollback()
+            print(f"error: {str(e)}")
+        finally:
+            db.close()
  
         
             
