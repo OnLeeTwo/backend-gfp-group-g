@@ -27,7 +27,7 @@ CORS(app, resources={r"/*": {"origins": cors_origin}})
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 username = os.getenv("DB_USERNAME")

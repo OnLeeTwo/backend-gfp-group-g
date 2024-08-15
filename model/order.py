@@ -20,7 +20,7 @@ class PaymentStatus(enum.Enum):
 class Order(Base):
     __tablename__ = "order"
 
-    order_id = mapped_column(String(10), primary_key=True, autoincrement=True)
+    order_id = mapped_column(String(10), primary_key=True)
     user_id = mapped_column(String(10), ForeignKey("users.user_id"), nullable=False)
     total_amount = mapped_column(DECIMAL, nullable=False)
     created_at = mapped_column(
@@ -30,4 +30,4 @@ class Order(Base):
     status_order = mapped_column(Enum(OrderStatus), nullable=False)
     status_payment = mapped_column(Enum(PaymentStatus), nullable=False)
     shipping_address = mapped_column(Text, nullable=False)
-    promotion_id = mapped_column(Integer, ForeignKey("promotion.promotion_id"))
+    promotion_id = mapped_column(Integer, ForeignKey("promotions.promotion_id"))
