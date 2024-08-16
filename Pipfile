@@ -14,6 +14,8 @@ python-dotenv = "*"
 mysql-connector-python = "*"
 boto3 = "*"
 flask_cors="*"
+gunicorn = "*"
+
 
 [dev-packages]
 flask = "*"

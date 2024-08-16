@@ -380,10 +380,10 @@ def show_cart():
             return {
                 "message": "Quantities more than stock "
             }, 400
-        
-        product_on_cart = check_cart.showProductOnCart()
+        cart = check_cart.showProductOnCart()
+      
         return {
-            "product_on_cart": product_on_cart
+            "product_on_cart": cart
         }, 200
 
     except Exception as e:

@@ -99,59 +99,41 @@ class OrderCheck:
         Session = sessionmaker(connection)
         db = Session()
         db.begin()
+     
 
         try:
             product_by_market = {}
-           
+    
             for market in self.carts:
-                order_details = []
+            
+                products_on_market = []
                 for products in self.carts[market]:
-                    product = db.query(Product).filter(Product.id == products["product_id"]).first()
+                    product = db.query(Product).filter(Product.id == products['product_id']).first()
+                    category = db.query(Category).filter(Category.id == product.category_id).first()
                    
-                  
-                    order_details.append({
-                        "order_id": id,
-                        "product_id": product.id,
+                    products_on_market.append({
+                        "name": product.name,
+                        "market_id": product.market_id,
+                        "product_name": product.name,
+                        "description": product.description,
+                        "price": product.price,
+                        "stock": product.stock,
+                        "images": f"{R2_DOMAINS}/{product.images}",
+                        "category": category.name,
+                        "is_premium": product.is_premium,
                     })
-                  
-                    product_by_market[market] = {
-                        "order_details": order_details,
-                    }
-                return product_by_market
 
+                    print(products_on_market)
+
+                product_by_market[market] = {
+                    "market": market,
+                    "product": products_on_market
+                }
+            
+           
+            return product_by_market
         except Exception as e:
             db.rollback()
-            print(f"error: {str(e)}")
+            print(f"Error: {str(e)}")
         finally:
             db.close()
-
-    def matchProductQty(self):
-        Session = sessionmaker(connection)
-     
-       
-        for market in self.carts:
-            print(market)
-            db = Session()
-            db.begin()
-
-            try:
-                product = db.query(Product).filter(Product.id == self.carts[market][0]["product_id"]).first()
-                print(f"product {product.name} stock {product.stock}")
-                quantity = self.carts[market][0]["quantity"]
-                product.stock = product.stock - quantity
-                print(f"product {product.name} dikurang qty. stock {product.stock}")
-                db.commit()            
-            except Exception as e:
-                db.rollback()
-                print(f"error: {str(e)}")
-            finally:
-                db.close()
-        
-        return None
- 
-        
-            
-
-
-
-        
