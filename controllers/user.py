@@ -1,5 +1,7 @@
-from flask import Blueprint, request
-from datetime import datetime, UTC
+from flask import Blueprint, request, json
+from datetime import datetime, UTC, timedelta
+import os
+
 from model.user import User
 from model.seller import Seller
 from model.token import TokenBlocklist
@@ -8,11 +10,12 @@ from validations.user_register import user_register_schema
 from validations.login import login_schema
 from validations.user_update import user_update_schema
 
+from services.upload import UploadService
+
 from connectors.mysql_connectors import connection
 from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 
-from services.upload import UploadService
 from nanoid import generate
 from cerberus import Validator
 import os
@@ -23,12 +26,15 @@ from flask_jwt_extended import (
     get_jwt,
     get_jwt_identity,
     current_user,
+    decode_token,
 )
+
 
 R2_DOMAINS=os.getenv('R2_DOMAINS')
 
 user_routes = Blueprint("user_routes", __name__)
 upload_service = UploadService()
+
 
 @user_routes.route("/users", methods=["POST"])
 def register_user():
@@ -148,26 +154,42 @@ def login():
 @jwt_required()
 def get_user():
 
-    return (
-        {
-            "user_id": current_user.user_id,
-            "email": current_user.email,
-            "role": current_user.role,
-            "created_at": current_user.created_at,
-            "updated_at": current_user.updated_at,
-            "profile_picture": f"{R2_DOMAINS}/{current_user.profile_picture}",
-        }
-    ), 200
+    data = {
+        "user_id": current_user.user_id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+        "profile_picture": f"{R2_DOMAINS}/{current_user.profile_picture}",
+        "address": current_user.address,
+    }
+    return {"success": "data fetched successfully", "data": data}, 200
+
 
 
 @user_routes.route("/users", methods=["PUT"])
 @jwt_required()
 def update_user():
-    v = Validator(user_update_schema)
-    request_body = {
-        "email": request.form["email"],
-        "password": request.form["password"],
-    }
+    v = Validator(user_update_schema, allow_unknown=True)
+
+    request_body = {}
+
+    if "email" in request.form:
+        request_body["email"] = request.form["email"]
+
+    if "password" in request.form:
+        request_body["password"] = request.form["password"]
+
+    if "name" in request.form:
+        request_body["name"] = request.form["name"]
+
+    if "address" in request.form:
+        try:
+            address_data = json.loads(request.form["address"])
+            request_body["address"] = address_data
+        except json.JSONDecodeError:
+            return {"error": "Invalid address format"}, 400
 
     if not v.validate(request_body):
         return {"error": v.errors}, 400
@@ -187,19 +209,31 @@ def update_user():
             user.email = request_body["email"]
         if "password" in request_body:
             user.set_password(request_body["password"])
+        if "name" in request_body:
+            user.name = request_body["name"]
+        if "address" in request_body:
+            user.address = request_body["address"]
 
         user.updated_at = func.now()
 
-        if "images" in request.files:
-            file = request.files["images"]
+        if "profile_picture" in request.files:
+            file = request.files["profile_picture"]
             if file.filename == "":
                 return {"error": "No selected file"}, 400
-            filename = file.filename
-            try:
-                file_url = upload_service.upload_file(file, filename)
-                user.profile_picture = file_url
-            except Exception as e:
-                return {"error": str(e)}, 500
+            if file and allowed_file(file.filename):
+
+                filename = file.filename
+                ext_name = os.path.splitext(filename)[1]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{current_user_id}-{timestamp}{ext_name}"
+
+                try:
+                    upload_service.upload_file(file, new_filename)
+                    user.profile_picture = new_filename
+                except Exception as e:
+                    return {"error": str(e)}, 500
+            else:
+                return {"error": "file type not allowed"}, 415
 
         s.commit()
         return {"message": "User updated successfully"}, 200
@@ -237,14 +271,26 @@ def delete_user():
         s.close()
 
 
-@user_routes.get("/refresh")
-@jwt_required(refresh=True)
-def refresh_access():
-    identity = get_jwt_identity()
+@user_routes.route("/refresh", methods=["GET"])
+def refresh_token():
+    data = request.get_json()
+    refresh_token = data.get("refresh_token")
 
-    new_access_token = create_access_token(identity=identity)
+    if not refresh_token:
+        return {"error": "Refresh token is required"}, 400
 
-    return {"access_token": new_access_token}
+    try:
+        decode_token(refresh_token, options={"verify_exp": True})
+
+        current_user = get_jwt_identity()
+        access_token = create_access_token(
+            identity=current_user, xpires_delta=timedelta(hours=1)
+        )
+
+        return {"access_token": access_token}, 200
+
+    except Exception as e:
+        return {"error": str(e)}, 401
 
 
 @user_routes.route("/logout", methods=["POST"])
