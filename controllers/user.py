@@ -38,7 +38,10 @@ R2_DOMAINS=os.getenv('R2_DOMAINS')
 user_routes = Blueprint("user_routes", __name__)
 upload_service = UploadService()
 
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 @user_routes.route("/users", methods=["POST"])
 def register_user():
     v = Validator(user_register_schema)
