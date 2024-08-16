@@ -35,6 +35,7 @@ def show_wishlist():
 
             wishlist.append(
                 {
+                    "id": products.id,
                     "name": products.name,
                     "price": products.price,
                     "stock": products.stock,

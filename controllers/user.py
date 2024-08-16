@@ -30,18 +30,21 @@ from flask_jwt_extended import (
     decode_token,
 )
 
-R2_DOMAINS=os.getenv('R2_DOMAINS')
+R2_DOMAINS = os.getenv("R2_DOMAINS")
 
 
-R2_DOMAINS=os.getenv('R2_DOMAINS')
+R2_DOMAINS = os.getenv("R2_DOMAINS")
 
 user_routes = Blueprint("user_routes", __name__)
 upload_service = UploadService()
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 @user_routes.route("/users", methods=["POST"])
 def register_user():
     v = Validator(user_register_schema)
@@ -173,7 +176,6 @@ def get_user():
     return {"success": "data fetched successfully", "data": data}, 200
 
 
-
 @user_routes.route("/users", methods=["PUT"])
 @jwt_required()
 def update_user():
@@ -290,7 +292,7 @@ def refresh_token():
 
         current_user = get_jwt_identity()
         access_token = create_access_token(
-            identity=current_user, xpires_delta=timedelta(hours=1)
+            identity=current_user, expires_delta=timedelta(hours=1)
         )
 
         return {"access_token": access_token}, 200
