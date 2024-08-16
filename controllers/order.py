@@ -9,6 +9,8 @@ from nanoid import generate
 
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
+from services.order_check import OrderCheck
+
 
 from flask_jwt_extended import (
     jwt_required,
@@ -19,66 +21,111 @@ from flask_jwt_extended import (
 order_routes = Blueprint("order_routes", __name__)
 
 
+
 @order_routes.route("/order", methods=["POST"])
 @jwt_required()
 def create_order():
+    # pertama cek dulu apakah stock yang dari cart masih ada
+    # Kedua Cek voucher valid
+    # Ketiga hitung total (nilai pada product - voucher + ongkir )
+
     Session = sessionmaker(connection)
     s = Session()
 
     s.begin()
     try:
         user_id = current_user.user_id
-        order_details = (
-            s.query(OrderDetails)
-            .filter(OrderDetails.user_id == user_id, OrderDetails.order_id.is_(None))
-            .all()
-        )
-        if not order_details:
-            return {"error": "No item in cart!"}, 400
+        carts = request.form.get('cart')
 
-        new_order_id = f"O-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
-        log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
-        total_amount = sum(detail.total_price for detail in order_details)
-
-        promotion_code = request.form["code"]
-        discount_amount = 0
-
-        if promotion_code:
-            promotion = (
-                s.query(Promotion).filter(Promotion.code == promotion_code).first()
-            )
-
-            if not promotion:
-                return {"error": "Invalid promotion code"}, 400
-
-            current_date = datetime.now(UTC)
+        # Check Product in cart have an enough stock
+        if carts is None or carts == "":
+            return {
+                "message": "cart is empty"
+            }, 400
+        check_cart = OrderCheck(carts)
+       
+        if check_cart is None: 
+            return {
+                "message": "Quantities more than stock "
+            }, 400
+        
+        # Check if code promotion is valid
+        promotion_code = request.form.get("code")
+        promotion_id = None
+        discount_value = 0.0
+        if promotion_code is not None:
+            promotion = s.query(Promotion).filter(Promotion.code == promotion_code).first()
+            if promotion is None:
+                return {
+                    "message": "Promotion code not found"
+                }, 404
+            current_date = datetime.now(UTC).date()
+           
             if current_date < promotion.start_date or current_date > promotion.end_date:
                 return {"error": "Promotion code has expired"}, 400
+            
+            discount_value = promotion.discount_value
+            promotion_id = promotion.promotion_id
+        
 
-            discount_amount = total_amount * promotion.discount_value
-            total_amount -= discount_amount
+        data = check_cart.SumOrderDetail(discount_value)
+        log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
 
-        NewOrder = Order(
-            user_id=user_id,
-            order_id=new_order_id,
-            total_amount=total_amount,
-            status_order=OrderStatus.pending,
-            status_payment=PaymentStatus.pending,
-            shipping_address=request.form["shipping_address"],
-            promotion_id=promotion.promotion_id if promotion else None,
-        )
+        for market_id, details in data.items():
+            amount = details["amount"]
+            order_details = details["order_details"]
+            tax = details["tax"]
+            shipping_fee = details["shipping_fee"]
+            admin_fee = details["admin_fee"]
 
-        s.add(NewOrder)
+            # Generate the order ID for the market
+            id = f"O-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
+    
+            print(f"Market ID: {market_id}")
+            print(f"Amount: {amount}")
+            print(f"Order id:{id}")
+    
+            # Create the new order
+            NewOrder = Order(
+                user_id=user_id,
+                order_id=id,
+                total_amount=amount,
+                tax=tax,
+                shipping_fee=shipping_fee,
+                admin_fee=admin_fee,
+                status_order=OrderStatus.pending,
+                status_payment=PaymentStatus.pending,
+                shipping_address=request.form["shipping_address"],
+                promotion_id=promotion_id,
+                created_by=user_id
+            )
 
-        for detail in order_details:
-            detail.order_id = new_order_id
+            s.add(NewOrder)
+            transformed_data = [
+                {
+                    "order_details_id": item["order_id"],
+                    "order_id": id,
+                    "product_id": item["product_id"],
+                    "quantity": item["quantity"],
+                    "total_price": item["total_price"],
+                    "user_id": user_id
+                }
+                for item in order_details
+            ]
+            s.bulk_insert_mappings(OrderDetails, transformed_data)
 
+
+        # Update product qty
         order_dict = NewOrder.__dict__
         order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
         log_manager.set_after(after_data=order_dict)
+        
         s.commit()
         log_manager.save()
-        return {"message": "Order created successfully", "order_id": new_order_id}, 201
+
+        return {
+            "success": True
+        }, 201
 
     except Exception as e:
         s.rollback()
@@ -131,7 +178,7 @@ def get_all_orders_buyers_only():
         role = current_user.role
         user_id = current_user.user_id
 
-        if role is not "buyer":
+        if role != "buyer":
             return {"error": "Only buyer can access this routes!"}, 400
 
         orders = s.query(Order).filter(Order.user_id == user_id).all()

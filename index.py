@@ -17,16 +17,17 @@ from controllers.category import category_routes
 from controllers.market import market_routes
 from controllers.wishlist import wishlist_routes
 from controllers.promotion import promotion_routes
+from controllers.order import order_routes
 
 load_dotenv()
 
 app = Flask(__name__)
-host_url = os.getenv("HOST_URL")
-CORS(app, origins=[host_url], supports_credentials=True)
+cors_origin = os.getenv("CORS_ORIGIN")
+CORS(app, resources={r"/*": {"origins": cors_origin}})
 jwt = JWTManager(app)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 username = os.getenv("DB_USERNAME")
@@ -40,6 +41,7 @@ app.register_blueprint(category_routes)
 app.register_blueprint(market_routes)
 app.register_blueprint(wishlist_routes)
 app.register_blueprint(promotion_routes)
+app.register_blueprint(order_routes)
 
 
 @jwt.user_identity_loader

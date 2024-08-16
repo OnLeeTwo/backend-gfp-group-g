@@ -11,6 +11,7 @@ class Product(Base):
     id = mapped_column(String(10), primary_key=True)
     market_id = mapped_column(String(10), nullable=False)
     name =  mapped_column(String(100), nullable=False)
+    description = mapped_column(String, nullable=True)
     price =  mapped_column(Float, nullable=False)
     category_id =  mapped_column(String, nullable=False)
     stock =  mapped_column(Integer, nullable=False)

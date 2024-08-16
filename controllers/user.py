@@ -18,7 +18,8 @@ from sqlalchemy.orm import sessionmaker
 
 from nanoid import generate
 from cerberus import Validator
-
+import os
+import os
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -29,24 +30,18 @@ from flask_jwt_extended import (
     decode_token,
 )
 
-user_routes = Blueprint("user_routes", __name__)
+R2_DOMAINS=os.getenv('R2_DOMAINS')
 
-R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
-R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
-R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
-R2_DOMAINS = os.getenv("R2_DOMAINS")
-upload_service = UploadService(
-    R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME
-)
+
+R2_DOMAINS=os.getenv('R2_DOMAINS')
+
+user_routes = Blueprint("user_routes", __name__)
+upload_service = UploadService()
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
-
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
 @user_routes.route("/users", methods=["POST"])
 def register_user():
     v = Validator(user_register_schema)
@@ -164,6 +159,7 @@ def login():
 @user_routes.route("/users", methods=["GET"])
 @jwt_required()
 def get_user():
+
     data = {
         "user_id": current_user.user_id,
         "name": current_user.name,
@@ -175,6 +171,7 @@ def get_user():
         "address": current_user.address,
     }
     return {"success": "data fetched successfully", "data": data}, 200
+
 
 
 @user_routes.route("/users", methods=["PUT"])
