@@ -1,4 +1,4 @@
-from flask import Blueprint, request, json
+from flask import Blueprint, request, json, make_response
 from datetime import datetime, UTC, timedelta
 import os
 
@@ -33,6 +33,13 @@ from flask_jwt_extended import (
 user_routes = Blueprint("user_routes", __name__)
 R2_DOMAINS = os.getenv("R2_DOMAINS")
 upload_service = UploadService()
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
@@ -229,11 +236,10 @@ def update_user():
                 filename = file.filename
                 ext_name = os.path.splitext(filename)[1]
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                new_filename = f"{current_user_id}-{timestamp}{ext_name}"
+                new_filename = f"{user.user_id}-{timestamp}{ext_name}"
 
                 try:
                     upload_service.upload_file(file, new_filename)
-                    user.profile_picture = new_filename
                 except Exception as e:
                     return {"error": str(e)}, 500
             else:
