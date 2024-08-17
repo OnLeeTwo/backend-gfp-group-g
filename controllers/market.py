@@ -102,8 +102,14 @@ def markets_all():
         markets = []
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 5, type=int)
+        name = request.args.get('name', '', type=str)
         offset = (page - 1) * per_page
-        data = s.query(Market).offset(offset).limit(per_page).all()
+        query = s.query(Market)
+        if name != '':
+            query = query.filter(Market.name.ilike(f'%{name}%'))
+        
+        query = query.offset(offset).limit(per_page)
+        data = query.all()
         total_market = s.query(Market).count()
         total_pages =(total_market + per_page - 1) // per_page
         for row in data:
