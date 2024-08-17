@@ -1,8 +1,6 @@
 from flask import Blueprint, request, jsonify
 from model.market import Market
 from model.seller import Seller
-from model.user import User
-from sqlalchemy import func
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
@@ -102,7 +100,12 @@ def markets_all():
     s.begin()
     try:
         markets = []
-        data = s.query(Market).all()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        offset = (page - 1) * per_page
+        data = s.query(Market).offset(offset).limit(per_page).all()
+        total_market = s.query(Market).count()
+        total_pages =(total_market + per_page - 1) // per_page
         for row in data:
             seller = s.query(Seller).filter(Seller.seller_id == row.seller_id).first()
             if seller:
@@ -120,7 +123,11 @@ def markets_all():
         
         return {
             "success": True,
-            "data": markets
+            "data": markets,
+            'total_pages': total_pages,
+            'current_page': page,
+            'per_page': per_page,
+            'total_items': total_market,
         }, 200
     except Exception as e:
         s.rollback()
