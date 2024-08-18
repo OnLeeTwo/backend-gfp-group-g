@@ -44,9 +44,9 @@ def products_all():
             query = query.filter(Product.name.ilike(f'%{name}'))
 
         
-        query = query.offset(offset).limit(per_page)
-        data = query.all()
-        total_product = s.query(Product).filter(Product.is_deleted == 0).count()
+        query_all = query.offset(offset).limit(per_page)
+        data = query_all.all()
+        total_product = query.count()
         print(total_product)
         total_pages = (total_product + per_page - 1) // per_page
         # result = s.execute(data)
@@ -130,11 +130,19 @@ def product_by_market_id(id):
     s = Session()
     s.begin()
     try:
-        data = (
-            s.query(Product)
-            .filter(Product.is_deleted == 0, Product.market_id == id)
-            .all()
-        )
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        name = request.args.get('name', '', type=str)
+        offset = (page - 1) * per_page
+        query = s.query(Product).filter(Product.is_deleted == 0, Product.market_id == id)
+        
+        if name != '':
+            query = query.filter(Product.name.ilike(f'%{name}%'))
+
+        query_all = query.offset(offset).limit(per_page)
+        data = query_all.all()
+        total_product = query.count()
+        total_pages = (total_product + per_page - 1 ) // per_page
         # result = s.execute(data)
         products = []
         for row in data:
@@ -155,9 +163,16 @@ def product_by_market_id(id):
         if len(products) < 1:
             return {"message": "Products is empty"}, 404
 
-        return {"success": True, "data": products}, 200
+        return {
+            "success": True,
+            "data": products,
+            'total_pages': total_pages,
+            'current_page': page,
+            'per_page': per_page,
+            'total_items': total_product,
+        }, 200
     except Exception as e:
-        return {"message": "Error handling server", "error": (e)}, 500
+        return {"message": "Error handling server", "error": str(e)}, 500
 
 
 @product_routes.route("/product", methods=["POST"])

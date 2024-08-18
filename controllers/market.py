@@ -107,10 +107,12 @@ def markets_all():
         query = s.query(Market)
         if name != '':
             query = query.filter(Market.name.ilike(f'%{name}%'))
+
+            
         
-        query = query.offset(offset).limit(per_page)
-        data = query.all()
-        total_market = s.query(Market).count()
+        query_all = query.offset(offset).limit(per_page)
+        data = query_all.all()
+        total_market = query.count()
         total_pages =(total_market + per_page - 1) // per_page
         for row in data:
             seller = s.query(Seller).filter(Seller.seller_id == row.seller_id).first()
