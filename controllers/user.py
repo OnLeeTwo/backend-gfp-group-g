@@ -281,7 +281,7 @@ def delete_user():
         s.close()
 
 
-@user_routes.route("/refresh", methods=["GET"])
+@user_routes.route("/refresh", methods=["POST"])
 def refresh_token():
     data = request.get_json()
     refresh_token = data.get("refresh_token")
