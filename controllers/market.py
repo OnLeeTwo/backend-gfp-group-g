@@ -1,8 +1,6 @@
 from flask import Blueprint, request, jsonify
 from model.market import Market
 from model.seller import Seller
-from model.user import User
-from sqlalchemy import func
 from nanoid import generate
 from connectors.mysql_connectors import connection
 from sqlalchemy.orm import sessionmaker
@@ -102,7 +100,24 @@ def markets_all():
     s.begin()
     try:
         markets = []
-        data = s.query(Market).all()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        name = request.args.get('name', '', type=str)
+        location = request.args.get('location', '', type=str)
+        offset = (page - 1) * per_page
+        query = s.query(Market)
+        if name != '':
+            query = query.filter(Market.name.ilike(f'%{name}%'))
+
+        if location !='':
+            query = query.filter(Market.location==location)
+
+            
+        
+        query_all = query.offset(offset).limit(per_page)
+        data = query_all.all()
+        total_market = query.count()
+        total_pages =(total_market + per_page - 1) // per_page
         for row in data:
             seller = s.query(Seller).filter(Seller.seller_id == row.seller_id).first()
             if seller:
@@ -120,7 +135,11 @@ def markets_all():
         
         return {
             "success": True,
-            "data": markets
+            "data": markets,
+            'total_pages': total_pages,
+            'current_page': page,
+            'per_page': per_page,
+            'total_items': total_market,
         }, 200
     except Exception as e:
         s.rollback()
@@ -128,6 +147,34 @@ def markets_all():
             "message": "error get markets",
             "error": str(e)  # Convert exception to string
         }), 500
+    finally:
+        s.close()
+
+
+@market_routes.route('/markets/location', methods=['GET'])
+def market_by_location():
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        markets = []
+        get_market = s.query(Market.location).distinct().all()
+        for row in get_market:
+            markets.append({
+                "location": row.location
+            })
+        if len(markets) < 1: 
+            return {
+                "message": "Market is empty"
+            }, 404
+        return {
+            "success": True,
+            "data": markets
+        }, 200
+    except Exception as e:
+        return {
+            "message": str(e)
+        }, 500
     finally:
         s.close()
 
