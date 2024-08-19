@@ -103,10 +103,14 @@ def markets_all():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 5, type=int)
         name = request.args.get('name', '', type=str)
+        location = request.args.get('location', '', type=str)
         offset = (page - 1) * per_page
         query = s.query(Market)
         if name != '':
             query = query.filter(Market.name.ilike(f'%{name}%'))
+
+        if location !='':
+            query = query.filter(Market.location==location)
 
             
         
@@ -143,6 +147,34 @@ def markets_all():
             "message": "error get markets",
             "error": str(e)  # Convert exception to string
         }), 500
+    finally:
+        s.close()
+
+
+@market_routes.route('/markets/location', methods=['GET'])
+def market_by_location():
+    Session = sessionmaker(connection)
+    s = Session()
+    s.begin()
+    try:
+        markets = []
+        get_market = s.query(Market.location).distinct().all()
+        for row in get_market:
+            markets.append({
+                "location": row.location
+            })
+        if len(markets) < 1: 
+            return {
+                "message": "Market is empty"
+            }, 404
+        return {
+            "success": True,
+            "data": markets
+        }, 200
+    except Exception as e:
+        return {
+            "message": str(e)
+        }, 500
     finally:
         s.close()
 

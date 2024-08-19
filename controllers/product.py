@@ -43,6 +43,9 @@ def products_all():
         if name != '':
             query = query.filter(Product.name.ilike(f'%{name}'))
 
+        if category != '':
+            query = query.filter(Product.category_id == category)
+
         
         query_all = query.offset(offset).limit(per_page)
         data = query_all.all()
