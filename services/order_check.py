@@ -42,7 +42,6 @@ class OrderCheck:
 
     def SumOrderDetail(self, discount_value):
         tax_percent = 11
-        price_fix = 0.0
         shipping_price = 10000
         admin_price = 5000
         Session = sessionmaker(connection)
@@ -53,11 +52,28 @@ class OrderCheck:
             product_by_market = {}
 
             for market in self.carts:
-                amount = 0
-                total_tax = 0
+                total_market_price = 0
                 order_details = []
-                for products in self.carts[market]:
 
+                for products in self.carts[market]:
+                    product = (
+                        db.query(Product)
+                        .filter(Product.id == products["product_id"])
+                        .first()
+                    )
+                    quantity = products["quantity"]
+                    total_market_price += Decimal(product.price * quantity)
+
+                discount_amount = total_market_price * Decimal(discount_value / 100)
+                total_market_price -= discount_amount
+
+                total_tax = total_market_price * Decimal(tax_percent / 100)
+                total_price_after_fees = (
+                    total_market_price + Decimal(shipping_price) + Decimal(admin_price)
+                )
+                final_amount = total_price_after_fees + total_tax
+
+                for products in self.carts[market]:
                     id = f"OD-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
                     product = (
                         db.query(Product)
@@ -65,33 +81,24 @@ class OrderCheck:
                         .first()
                     )
                     quantity = products["quantity"]
-                    price = Decimal(product.price * quantity)
-                    price_after_discount = price * Decimal(discount_value / 100)
-                    price = price - price_after_discount
-
-                    if price < 0:
-                        price = 0.0
-
-                    total_price = price + Decimal(shipping_price) + Decimal(admin_price)
-                    tax = total_price * Decimal(tax_percent / 100)
-                    price_fix = total_price + tax
-                    amount += price_fix
 
                     order_details.append(
                         {
                             "order_id": id,
                             "product_id": product.id,
-                            "total_price": round(price_fix, 2),
+                            "total_price": round(Decimal(product.price * quantity), 2),
                             "quantity": quantity,
                         }
                     )
                     product.stock = product.stock - quantity
+
                 product_by_market[market] = {
-                    "amount": round(amount, 2),
+                    "amount": round(final_amount, 2),
                     "order_details": order_details,
-                    "tax": total_tax,
+                    "tax": round(total_tax, 2),
                     "shipping_fee": shipping_price,
                     "admin_fee": admin_price,
+                    "discount_fee": round(discount_amount, 2),
                 }
 
             db.commit()
