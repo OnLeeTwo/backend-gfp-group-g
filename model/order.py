@@ -26,6 +26,7 @@ class Order(Base):
     tax = mapped_column(DECIMAL, nullable=False)
     shipping_fee = mapped_column(DECIMAL, nullable=False)
     admin_fee = mapped_column(DECIMAL, nullable=False)
+    discount_fee = mapped_column(DECIMAL, nullable=True)
     created_at = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

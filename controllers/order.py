@@ -21,7 +21,6 @@ from flask_jwt_extended import (
 order_routes = Blueprint("order_routes", __name__)
 
 
-
 @order_routes.route("/order", methods=["POST"])
 @jwt_required()
 def create_order():
@@ -35,41 +34,36 @@ def create_order():
     s.begin()
     try:
         user_id = current_user.user_id
-        carts = request.form.get('cart')
+        carts = request.form.get("cart")
 
         # Check Product in cart have an enough stock
         if carts is None or carts == "":
-            return {
-                "message": "cart is empty"
-            }, 400
+            return {"message": "cart is empty"}, 400
         check_cart = OrderCheck(carts)
-       
-        if check_cart is None: 
-            return {
-                "message": "Quantities more than stock "
-            }, 400
-        
+
+        if check_cart is None:
+            return {"message": "Quantities more than stock "}, 400
+
         # Check if code promotion is valid
         promotion_code = request.form.get("code")
         promotion_id = None
         discount_value = 0.0
         if promotion_code is not None:
-            promotion = s.query(Promotion).filter(Promotion.code == promotion_code).first()
+            promotion = (
+                s.query(Promotion).filter(Promotion.code == promotion_code).first()
+            )
             if promotion is None:
-                return {
-                    "message": "Promotion code not found"
-                }, 404
+                return {"message": "Promotion code not found"}, 404
             current_date = datetime.now(UTC).date()
-           
+
             if current_date < promotion.start_date or current_date > promotion.end_date:
                 return {"error": "Promotion code has expired"}, 400
-            
+
             discount_value = promotion.discount_value
             promotion_id = promotion.promotion_id
-        
 
         data = check_cart.SumOrderDetail(discount_value)
-        log_manager = LogManager(user_id=user_id,action='CREATE_ORDER')
+        log_manager = LogManager(user_id=user_id, action="CREATE_ORDER")
 
         for market_id, details in data.items():
             amount = details["amount"]
@@ -77,14 +71,15 @@ def create_order():
             tax = details["tax"]
             shipping_fee = details["shipping_fee"]
             admin_fee = details["admin_fee"]
+            discount_fee = details["discount_fee"]
 
             # Generate the order ID for the market
             id = f"O-{generate('1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)}"
-    
+
             print(f"Market ID: {market_id}")
             print(f"Amount: {amount}")
             print(f"Order id:{id}")
-    
+
             # Create the new order
             NewOrder = Order(
                 user_id=user_id,
@@ -93,11 +88,12 @@ def create_order():
                 tax=tax,
                 shipping_fee=shipping_fee,
                 admin_fee=admin_fee,
+                discount_fee=discount_fee,
                 status_order=OrderStatus.pending,
                 status_payment=PaymentStatus.pending,
                 shipping_address=request.form["shipping_address"],
                 promotion_id=promotion_id,
-                created_by=user_id
+                created_by=user_id,
             )
 
             s.add(NewOrder)
@@ -108,24 +104,23 @@ def create_order():
                     "product_id": item["product_id"],
                     "quantity": item["quantity"],
                     "total_price": item["total_price"],
-                    "user_id": user_id
+                    "user_id": user_id,
                 }
                 for item in order_details
             ]
             s.bulk_insert_mappings(OrderDetails, transformed_data)
 
-
         # Update product qty
         order_dict = NewOrder.__dict__
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_after(after_data=order_dict)
-        
+
         s.commit()
         log_manager.save()
 
-        return {
-            "success": True
-        }, 201
+        return {"success": True, "order_id": id, "total_amount": amount}, 201
 
     except Exception as e:
         s.rollback()
@@ -168,7 +163,7 @@ def get_all_orders():
         s.close()
 
 
-@order_routes.route("/order", methods=["GET"])
+@order_routes.route("/order/buyer", methods=["GET"])
 @jwt_required()
 def get_all_orders_buyers_only():
     Session = sessionmaker(connection)
@@ -193,6 +188,9 @@ def get_all_orders_buyers_only():
                     "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                     "shipping_address": order.shipping_address,
                     "promotion_id": order.promotion_id,
+                    "shipping_fee": order.shipping_fee,
+                    "admin_fee": order.admin_fee,
+                    "tax": order.tax,
                 }
             )
 
@@ -259,11 +257,6 @@ def update_order(order_id):
     Session = sessionmaker(connection)
     s = Session()
 
-    request_body = {
-        "status_payment": request.form["email"],
-        "status_order": request.form["password"],
-    }
-
     try:
         user_id = current_user.user_id
         order = (
@@ -274,14 +267,23 @@ def update_order(order_id):
 
         if not order:
             return {"error": "Order not found"}, 404
-        log_manager = LogManager(user_id=user_id, action='UPDATE_ORDER')
+        log_manager = LogManager(user_id=user_id, action="UPDATE_ORDER")
         order_dict = vars(order)
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_before(before_data=order_dict)
-        order.status_order = request_body["status_order"]
-        order.status_payment = request_body["status_payment"]
+
+        if "status_payment" in request.form:
+            order.status_payment = request.form["status_payment"]
+
+        if "status_order" in request.form:
+            order.status_order = request.form["status_order"]
+
         order_dict = vars(order)
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_after(after_data=order_dict)
         s.commit()
         log_manager.save()
@@ -303,7 +305,7 @@ def cancel_order(order_id):
 
     try:
         user_id = current_user.user_id
-        log_manager = LogManager(user_id=user_id,action='CANCEL_ORDER')
+        log_manager = LogManager(user_id=user_id, action="CANCEL_ORDER")
         order = (
             s.query(Order)
             .filter(Order.user_id == user_id, Order.order_id == order_id)
@@ -313,7 +315,9 @@ def cancel_order(order_id):
         if not order:
             return {"error": "Order not found"}, 404
         order_dict = vars(order)
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_before(before_data=order_dict)
         if order.status_order != OrderStatus.pending:
             return {"error": "Only pending orders can be cancelled"}, 400
@@ -321,7 +325,9 @@ def cancel_order(order_id):
         order.status_order = OrderStatus.cancelled
 
         order_dict = vars(order)
-        order_dict = str({key: value for key, value in order_dict.items() if not key.startswith('_')})
+        order_dict = str(
+            {key: value for key, value in order_dict.items() if not key.startswith("_")}
+        )
         log_manager.set_after(after_data=order_dict)
         s.commit()
         log_manager.save()

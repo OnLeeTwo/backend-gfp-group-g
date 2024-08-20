@@ -1,8 +1,11 @@
 from flask import Blueprint, request
 from sqlalchemy.orm import sessionmaker
+import os
+
 
 from model.order_details import OrderDetails
 from model.product import Product
+from model.market import Market
 from services.logActions import LogManager
 
 from connectors.mysql_connectors import connection
@@ -10,6 +13,8 @@ from connectors.mysql_connectors import connection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from nanoid import generate
+
+R2_DOMAINS = os.getenv("R2_DOMAINS")
 
 order_details_routes = Blueprint("order_details_routes", __name__)
 
@@ -107,7 +112,66 @@ def get_order_details():
         s.close()
 
 
-@order_details_routes.route("/order_details/<int:order_details_id>", methods=["GET"])
+@order_details_routes.route("/order_details/order/<string:order_id>", methods=["GET"])
+@jwt_required()
+def get_order_details_by_order_id(order_id):
+    Session = sessionmaker(connection)
+    s = Session()
+
+    s.begin()
+    try:
+        user_id = get_jwt_identity()
+        orders = (
+            s.query(OrderDetails).filter_by(order_id=order_id, user_id=user_id).all()
+        )
+
+        if not orders:
+            return {"message": "Order details not found for this order ID"}, 404
+
+        order_details_list = []
+
+        for order in orders:
+            product = s.query(Product).filter_by(id=order.product_id).first()
+
+            if product:
+                product_name = product.name
+                product_price = product.price
+                product_images = f"{R2_DOMAINS}/{product.images}"
+            else:
+                product_name = None
+                product_price = None
+                product_images = None
+
+            market = s.query(Market).filter_by(market_id=product.market_id).first()
+
+            if market:
+                market_name = market.name
+            else:
+                market_name = None
+
+            order_details_list.append(
+                {
+                    "order_id": order.order_id,
+                    "product_id": order.product_id,
+                    "quantity": order.quantity,
+                    "total_price": order.total_price,
+                    "product_name": product_name,
+                    "product_price": product_price,
+                    "product_images": product_images,
+                    "market_name": market_name,
+                }
+            )
+
+        return {"order_details": order_details_list}, 200
+
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    finally:
+        s.close()
+
+
+@order_details_routes.route("/order_details/<string:order_details_id>", methods=["GET"])
 def get_order_details_by_id(order_details_id):
     Session = sessionmaker(connection)
     s = Session()
