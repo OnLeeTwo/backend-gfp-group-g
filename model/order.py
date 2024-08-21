@@ -21,6 +21,7 @@ class Order(Base):
     __tablename__ = "order"
 
     order_id = mapped_column(String(10), primary_key=True)
+    market_id = mapped_column(String(10), ForeignKey("market.market_id"), nullable=True)
     user_id = mapped_column(String(10), ForeignKey("users.user_id"), nullable=False)
     total_amount = mapped_column(DECIMAL, nullable=False)
     tax = mapped_column(DECIMAL, nullable=False)
