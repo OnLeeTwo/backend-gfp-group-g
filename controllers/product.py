@@ -37,36 +37,42 @@ def products_all():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 5, type=int)
         name = request.args.get('name', '', type=str)
+        categorySearch = request.args.get('category', '', type=str)
         offset = (page - 1) * per_page
         query = s.query(Product).filter(Product.is_deleted == 0)
 
         if name != '':
             query = query.filter(Product.name.ilike(f'%{name}'))
 
-        if category != '':
-            query = query.filter(Product.category_id == category)
+        if categorySearch != '':
+            query = query.filter(Product.category_id == categorySearch)
 
         
         query_all = query.offset(offset).limit(per_page)
         data = query_all.all()
         total_product = query.count()
-        print(total_product)
         total_pages = (total_product + per_page - 1) // per_page
         # result = s.execute(data)
         for row in data:
             category = s.query(Category).filter(Category.id == row.category_id).first()
+            category_name = ''
+            if category is not None:
+                category_name = category.name
             MarketName = s.query(Market).filter(Market.market_id == row.market_id).first()
+            market_name = ''
+            if MarketName: 
+                market_name = MarketName.name
             products.append(
                 {
                     "id": row.id,
                     "product_name": row.name,
                     "description": row.description,
                     "market_id": row.market_id,
-                    "market_name": MarketName.name,
+                    "market_name": market_name,
                     "price": row.price,
                     "images": f"{R2_DOMAINS}/{row.images}",
                     "stock": row.stock,
-                    "category": category.name,
+                    "category": category_name,
                     "is_premium": row.is_premium,
                 }
             )
@@ -83,7 +89,7 @@ def products_all():
         }, 200
     except Exception as e:
         s.rollback()
-        return {"message": "error get products", "error": (e)}
+        return {"message": "error get products", "error": str(e)}
     finally:
         s.close()
 
