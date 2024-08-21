@@ -4,6 +4,8 @@ from datetime import datetime, UTC
 from model.order import Order, OrderStatus, PaymentStatus
 from model.order_details import OrderDetails
 from model.promotion import Promotion
+from model.seller import Seller
+from model.market import Market
 from services.logActions import LogManager
 from nanoid import generate
 
@@ -84,6 +86,7 @@ def create_order():
             NewOrder = Order(
                 user_id=user_id,
                 order_id=id,
+                market_id=market_id,
                 total_amount=amount,
                 tax=tax,
                 shipping_fee=shipping_fee,
@@ -193,6 +196,51 @@ def get_all_orders_buyers_only():
                     "tax": order.tax,
                 }
             )
+
+        return orders_data, 200
+
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    finally:
+        s.close()
+
+
+@order_routes.route("/order/seller", methods=["GET"])
+@jwt_required()
+def get_all_orders_seller_only():
+    Session = sessionmaker(connection)
+    s = Session()
+
+    try:
+        role = current_user.role
+        user_id = current_user.user_id
+
+        if role != "seller":
+            return {"error": "Only seller can access this routes!"}, 400
+
+        seller_id = s.query(Seller).filter(Seller.user_id == user_id).first().seller_id
+
+        markets = s.query(Market).filter(Market.seller_id == seller_id).all()
+
+        for market in markets:
+            orders = s.query(Order).filter(Order.market_id == market.market_id).all()
+            orders_data = []
+            for order in orders:
+                orders_data.append(
+                    {
+                        "order_id": order.order_id,
+                        "total_amount": order.total_amount,
+                        "status_order": order.status_order.value,
+                        "status_payment": order.status_payment.value,
+                        "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                        "shipping_address": order.shipping_address,
+                        "promotion_id": order.promotion_id,
+                        "shipping_fee": order.shipping_fee,
+                        "admin_fee": order.admin_fee,
+                        "tax": order.tax,
+                    }
+                )
 
         return orders_data, 200
 
