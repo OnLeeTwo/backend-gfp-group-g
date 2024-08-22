@@ -307,11 +307,7 @@ def update_order(order_id):
 
     try:
         user_id = current_user.user_id
-        order = (
-            s.query(Order)
-            .filter(Order.user_id == user_id, Order.order_id == order_id)
-            .first()
-        )
+        order = s.query(Order).filter(Order.order_id == order_id).first()
 
         if not order:
             return {"error": "Order not found"}, 404
