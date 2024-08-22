@@ -19,6 +19,7 @@ from controllers.wishlist import wishlist_routes
 from controllers.promotion import promotion_routes
 from controllers.order import order_routes
 from controllers.order_details import order_details_routes
+from controllers.seller import seller_routes
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ host = os.getenv("DB_HOST")
 database = os.getenv("DB_DATABASE")
 
 app.register_blueprint(user_routes)
+app.register_blueprint(seller_routes)
 app.register_blueprint(product_routes)
 app.register_blueprint(category_routes)
 app.register_blueprint(market_routes)
