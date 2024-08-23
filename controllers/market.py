@@ -107,7 +107,7 @@ def markets_all():
         if name != "":
             query = query.filter(Market.name.ilike(f"%{name}%"))
 
-        if location != "":
+        if location !='':
             query = query.filter(Market.location == location)
 
         query_all = query.offset(offset).limit(per_page)
